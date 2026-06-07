@@ -463,7 +463,6 @@
             } else if (type === 'ultimate') {
                 title.innerText = "☕ 萃比覺醒！"; subtitle.innerText = "✨ 達到 35 級，解鎖隱藏潛能 ✨";
                 desc.innerHTML = "<strong>【解鎖大絕招：終極拉花大師】</strong><br>每當能量條集滿時，萃比會自動發動<strong style='color:#f1c40f;font-size:26px;'>全螢幕毀滅性拉花攻擊</strong>，掃蕩周圍所有喪屍！";
-                player.hasLimitless = true; // 確保邏輯同步
             }    
             infoScreen.style.display = 'flex';
         }
@@ -743,7 +742,7 @@
                 }
                 if (c.timer <= 0) {
                     let a = Math.atan2(player.y - c.y, player.x - c.x);
-                    bossBullets.push({x: c.x, y: c.y, vx: Math.cos(a)*6, vy: Math.sin(a)*6, radius: 10, dmg: 40, type: 'mimicArrow', isHoming: true}); mimicChests.splice(i, 1);
+                    bossBullets.push({x: c.x, y: c.y, vx: Math.cos(a)*6, vy: Math.sin(a)*6, radius: 10, dmg: 80, type: 'mimicArrow', isHoming: true}); mimicChests.splice(i, 1);
                 }
             }
 
@@ -772,14 +771,14 @@
                 if (ct.warningTimer > 0) ct.warningTimer--;
                 else {
                     ct.x += ct.vx;
-                    if (!ct.hit && getDistance(ct.x, ct.y, player.x, player.y) < player.collisionRadius + ct.height/2) { takeDamage(80); player.x -= 200; ct.hit = true; }
+                    if (!ct.hit && getDistance(ct.x, ct.y, player.x, player.y) < player.collisionRadius + ct.height/2) { takeDamage(220); player.x -= 200; ct.hit = true; }
                     if (ct.x < -ct.width) cyberTrucks.splice(i, 1);
                 }
             }
 
             for (let i = starlinks.length - 1; i >= 0; i--) {
                 let sl = starlinks[i]; sl.timer--;
-                if (sl.timer <= 0) { if (getDistance(sl.x, sl.y, player.x, player.y) < sl.radius) takeDamage(60); starlinks.splice(i, 1); }
+                if (sl.timer <= 0) { if (getDistance(sl.x, sl.y, player.x, player.y) < sl.radius) takeDamage(160); starlinks.splice(i, 1); }
             }
 
             for (let i = kPillars.length - 1; i >= 0; i--) {
@@ -1078,7 +1077,7 @@
                         e.attackTimer++;
                         if (e.attackTimer % 400 === 0 && isB) blackHoles.push({x: e.x + (Math.random()*600-300), y: e.y + (Math.random()*600-300), timer: 180, isPlayer: false});
                         if (e.attackTimer % 600 === 300 && isB) {
-                            explosions.push({ x: e.x, y: e.y, maxRadius: 800, currentRadius: 10, alpha: 1.0, isRed: true, dmg: 80 });
+                            explosions.push({ x: e.x, y: e.y, maxRadius: 800, currentRadius: 10, alpha: 1.0, isRed: true, dmg: 280 });
                             if (getDistance(e.x, e.y, player.x, player.y) < 800) { let a = Math.atan2(player.y - e.y, player.x - e.x); player.x += Math.cos(a) * 300; player.y += Math.sin(a) * 300; }
                         }
                         if (!e.hasTriggeredVoid && e.hp < e.maxHp * 0.8 && Math.random() < 0.02 && isB) { e.hasTriggeredVoid = true; controlsInverted = 300; }
@@ -1090,18 +1089,18 @@
                         }
                     } else {
                         e.attackTimer++;
-                        if (e.bossType === 1) { if (getDistance(e.x, e.y, player.x, player.y) < (isB ? 300 : 120)) { if (frameCount % 30 === 0) takeDamage(isB ? 20 : 5); } } 
+                        if (e.bossType === 1) { if (getDistance(e.x, e.y, player.x, player.y) < (isB ? 300 : 120)) { if (frameCount % 30 === 0) takeDamage(isB ? 100 : 25); } } 
                         else if (e.bossType === 2) {
                             if (e.attackTimer >= 180) {
                                 e.attackTimer = 0; let bulletCount = isB ? 12 : 6;
-                                for (let j = 0; j < bulletCount; j++) { let a = (Math.PI * 2 / bulletCount) * j; bossBullets.push({x: e.x, y: e.y, vx: Math.cos(a)*4, vy: Math.sin(a)*4, radius: isB ? 15 : 8, dmg: isB ? 40 : 15, type: 'boss2'}); }
+                                for (let j = 0; j < bulletCount; j++) { let a = (Math.PI * 2 / bulletCount) * j; bossBullets.push({x: e.x, y: e.y, vx: Math.cos(a)*4, vy: Math.sin(a)*4, radius: isB ? 15 : 8, dmg: isB ? 200 : 50, type: 'boss2'}); }
                             }
                         } else if (e.bossType === 3) {
                             if (isB && e.attackTimer === 240) cyberTrucks.push({x: canvas.width + 200, y: player.y, width: 300, height: 100, vx: -30, warningTimer: 60, hit: false});
                             else if (e.attackTimer >= 480) { e.attackTimer = 0; for(let k=0; k < (isB ? 6 : 2); k++) starlinks.push({x: player.x + (Math.random()*600-300), y: player.y + (Math.random()*600-300), radius: isB ? 80 : 40, timer: 90}); }
                         } else if (e.bossType === 4) {
                             if (e.attackTimer % 180 === 0) kPillars.push({x: player.x, y: player.y, radius: isB ? 60 : 30, timer: 240});
-                            if (getDistance(e.x, e.y, player.x, player.y) < (isB ? 400 : 150)) { let distMoved = Math.hypot(player.x - player.lastX, player.y - player.lastY); if (distMoved < 1 && frameCount % 10 === 0) takeDamage(isB ? 15 : 5); }
+                            if (getDistance(e.x, e.y, player.x, player.y) < (isB ? 400 : 150)) { let distMoved = Math.hypot(player.x - player.lastX, player.y - player.lastY); if (distMoved < 1 && frameCount % 10 === 0) takeDamage(isB ? 45 : 15); }
                         }
                     }
                 }
@@ -1410,12 +1409,19 @@
                     ctx.font='60px Arial'; ctx.fillText(e.emoji, e.x, e.y);
                 } else {
                     if (e.img && e.img.complete && e.img.naturalHeight !== 0) {
-                        const ar = e.img.naturalWidth / e.img.naturalHeight; let tw = 100;
+                        const ar = e.img.naturalWidth / e.img.naturalHeight; 
+                        let drawWidth = 50; // 一般小怪視覺寬度
+                        
+                        // 萃比的視覺寬度是 80，王的視覺寬度 1.5 倍直接鎖定在 120
                         if (e.isBoss) {
-                            tw = 120; // 改為1.5倍的繪製大小
-                        } else if (e.isMiniBoss && e.bossType === 5) tw = 50;
-                        const th = tw / ar;
-                        ctx.drawImage(e.img, e.x - (tw*0.5)/2, e.y - (th*0.5)/2, tw*0.5, th*0.5);
+                            drawWidth = 120; 
+                        } else if (e.isMiniBoss && e.bossType === 5) {
+                            drawWidth = 25;
+                        }
+                        
+                        const drawHeight = drawWidth / ar;
+                        // 移除結尾的 *0.5，直接用計算好的寬高繪製
+                        ctx.drawImage(e.img, e.x - drawWidth/2, e.y - drawHeight/2, drawWidth, drawHeight);
                     }
                 }
                 
