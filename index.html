@@ -127,39 +127,51 @@
         btnFullscreen.addEventListener('click', triggerFullscreen);
         btnFullscreen.addEventListener('touchend', triggerFullscreen);
 
-        // === 3. 畫面縮放與視窗綁定 ===
+        // === 3. 畫面縮放 ===
         function resizeCanvas() {
             canvas.width = window.innerWidth; canvas.height = window.innerHeight;
-            if (typeof player !== 'undefined' && player.x) { 
-                player.x = Math.max(player.collisionRadius, Math.min(canvas.width - player.collisionRadius, player.x));
-                player.y = Math.max(player.collisionRadius, Math.min(canvas.height - player.collisionRadius - 60, player.y));
-            }
         }
         window.addEventListener('resize', resizeCanvas);
 
-        // === 4. 手機觸控跟隨邏輯 (核心修復區) ===
-        let touchTarget = null; // 用來儲存手指目前的座標
+        // === 4. 隱形動態搖桿邏輯 ===
+        let joystick = {
+            active: false,
+            originX: 0, originY: 0,
+            currentX: 0, currentY: 0,
+            touchId: null
+        };
 
-        function handleTouchMove(e) {
-            if (e.target === btnFullscreen) return;
-            if (isPaused || isUpgrading || isInfoMenu || hasWon) return;
-            e.preventDefault(); // 防止畫面捲動
+
+        // --- 修改後的觸控監聽區塊 ---
+        canvas.addEventListener('touchstart', (e) => {
+            if (e.target === btnFullscreen || isPaused || isUpgrading || isInfoMenu || hasWon) return;
             const touch = e.touches[0];
             const rect = canvas.getBoundingClientRect();
-            // 記錄手指位置，讓 Update 迴圈去追逐它
-            touchTarget = {
-                x: touch.clientX - rect.left,
-                y: touch.clientY - rect.top
-            };
-        }
+            joystick.active = true;
+            joystick.originX = touch.clientX - rect.left;
+            joystick.originY = touch.clientY - rect.top;
+            joystick.currentX = joystick.originX;
+            joystick.currentY = joystick.originY;
+            joystick.touchId = touch.identifier;
+        }, {passive: false});
 
-        canvas.addEventListener('touchstart', handleTouchMove, {passive: false});
-        canvas.addEventListener('touchmove', handleTouchMove, {passive: false});
+        canvas.addEventListener('touchmove', (e) => {
+            if (!joystick.active) return;
+            e.preventDefault();
+            const touch = Array.from(e.touches).find(t => t.identifier === joystick.touchId);
+            if (touch) {
+                const rect = canvas.getBoundingClientRect();
+                joystick.currentX = touch.clientX - rect.left;
+                joystick.currentY = touch.clientY - rect.top;
+            }
+        }, {passive: false});
+
         canvas.addEventListener('touchend', (e) => {
             if (e.target !== btnFullscreen) e.preventDefault();
-            touchTarget = null; // 手指放開，停止移動
+            joystick.active = false;
         }, {passive: false});
-        canvas.addEventListener('touchcancel', () => touchTarget = null);
+
+        canvas.addEventListener('touchcancel', () => joystick.active = false);
 
         // -------- 以下為遊戲核心變數與邏輯 --------
         const playerImg = document.getElementById('img_cuibi');
@@ -493,17 +505,28 @@
             if (keys.a || keys.ArrowLeft) moveX -= player.speed;
             if (keys.d || keys.ArrowRight) moveX += player.speed;
 
-            // 手機搖桿跟隨邏輯
-            if (touchTarget) {
-                let dx = touchTarget.x - player.x;
-                let dy = touchTarget.y - player.y;
+            // --- update() 內部的移動計算區塊 ---
+
+            // 鍵盤移動維持不變
+            if (keys.w || keys.ArrowUp) moveY -= player.speed;
+            if (keys.s || keys.ArrowDown) moveY += player.speed;
+            if (keys.a || keys.ArrowLeft) moveX -= player.speed;
+            if (keys.d || keys.ArrowRight) moveX += player.speed;
+
+            // 替換原本的 touchTarget 為動態搖桿邏輯
+            if (joystick.active) {
+                let dx = joystick.currentX - joystick.originX;
+                let dy = joystick.currentY - joystick.originY;
                 let dist = Math.hypot(dx, dy);
-                if (dist > player.speed) {
-                    moveX += (dx / dist) * player.speed;
-                    moveY += (dy / dist) * player.speed;
-                } else {
-                    player.x = touchTarget.x;
-                    player.y = touchTarget.y;
+                
+                // 設定最大輸出半徑 (例如 100px)，這決定了手感靈敏度
+                let maxDist = 100;
+                let power = Math.min(dist / maxDist, 1); 
+
+                if (dist > 0) {
+                    // 這裡的 3 可以調整為你想要的角色最大移動速度倍率
+                    moveX += (dx / dist) * player.speed * power * 3; 
+                    moveY += (dy / dist) * player.speed * power * 3;
                 }
             }
 
@@ -1516,7 +1539,6 @@
             }
 
             ctx.restore();
-
         }
 
         function gameLoop() { if (!isPaused && !hasWon) { update(); } draw(); requestAnimationFrame(gameLoop); }
