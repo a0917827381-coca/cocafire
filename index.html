@@ -16,23 +16,26 @@
         }
         canvas { background-color: #2c3e50; display: block; }
         
-        /* 升級與資訊視窗通用設定 */
+        /* 升級與資訊視窗：使用 min-height 確保內容夠長時可捲動，但內容少時仍能置中 */
         #upgradeScreen, #infoScreen {
             position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
             background: rgba(0, 0, 0, 0.9); display: none; 
             flex-direction: column; 
-            justify-content: flex-start; /* 改為 flex-start 讓內容由上往下排列 */
+            justify-content: center; /* 改回 center，在內容短時維持美感 */
             align-items: center; 
             z-index: 100;
-            overflow-y: auto;          /* 關鍵：當內容過長時，自動開啟滾動條 */
+            overflow-y: auto;        /* 關鍵：過長時才出現捲動 */
             padding: 20px;
             box-sizing: border-box;
+            min-height: 100vh;       /* 關鍵：讓容器高度至少等於視窗高度 */
         }
 
-        /* 讓卡片容器在手機上支援自動換行 */
+        /* 若內容超長，我們讓內部容器可以頂部對齊 */
         .cards-container { 
             display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; 
+            align-items: center; /* 讓卡片在內容少時居中 */
             margin-top: 20px; 
+            margin-bottom: 20px;
         }
 
         /* 確保內容區域不會太高 */
@@ -42,15 +45,16 @@
             margin: 20px 0;
         }
 
-        /* 將按鈕移出流式佈局，釘在螢幕底部確保一定能點到 */
+        /* 按鈕維持 sticky，確保在捲動時它會固定在適當位置 */
         #btnContinueInfo {
-            position: sticky; /* 或者改用 fixed */
+            position: sticky; 
             bottom: 20px;
-            margin-top: 20px;
+            margin: 20px 0;
             background: linear-gradient(135deg, #f1c40f 0%, #e67e22 100%);
             color: #fff; font-size: 24px; font-weight: bold; font-family: '微軟正黑體';
             padding: 15px 40px; border: none; border-radius: 50px; cursor: pointer;
             box-shadow: 0 5px 15px rgba(243, 156, 18, 0.4);
+            flex-shrink: 0; /* 防止按鈕被壓扁 */
         }
         #btnFullscreen {
             position: fixed;       /* 改為 fixed 確保固定在螢幕上 */
@@ -216,7 +220,7 @@
         const trumpWalls = [];
 
         const player = { 
-            x: 0, y: 0, lastX: 0, lastY: 0, collisionRadius: 40, speed: 1.5, hp: 500, maxHp: 500, baseCritRate: 0.05, 
+            x: 0, y: 0, lastX: 0, lastY: 0, collisionRadius: 20, speed: 1.5, hp: 500, maxHp: 500, baseCritRate: 0.05, 
             shoutTimer: 0, shoutText: "",
             hasBoss1Skill: false, hasBoss2Skill: false, boss2Timer: 0,
             hasHoming: false, hasBoss3Skill: false, boss3Timer: 0,
@@ -669,10 +673,10 @@
                 let ultCd = ultBaseCd * globalCdMult; 
                 isUltimateReady = (frameCount - skillData[SKILL_TYPES.ULULTIMATE].lastFiredFrame) >= ultCd;
 
-                if (isUltimateReady && keys[" "]) {
-                    skillData[SKILL_TYPES.ULULTIMATE].lastFiredFrame = frameCount;
-                    isUltimateReady = false; 
-                    ultimates.push({ timer: 60, maxTimer: 60 });
+                if (isUltimateReady) {
+                        skillData[SKILL_TYPES.ULULTIMATE].lastFiredFrame = frameCount;
+                        isUltimateReady = false; 
+                        ultimates.push({ timer: 60, maxTimer: 60 });
                     for(let p=0; p<60; p++) {
                         let pa = Math.random() * Math.PI * 2; let pSpeed = Math.random() * 25 + 10;
                         ultParticles.push({ x: canvas.width/2, y: canvas.height/2, vx: Math.cos(pa) * pSpeed, vy: Math.sin(pa) * pSpeed, life: 60, size: Math.random()*15 + 5, color: Math.random() > 0.5 ? '#f1c40f' : '#fff' });
@@ -955,18 +959,18 @@
 
             for (let i = ultimates.length - 1; i >= 0; i--) { ultimates[i].timer--; if (ultimates[i].timer <= 0) ultimates.splice(i, 1); }
 
-            if (level >= 40 && !boss1Spawned) { boss1Spawned = true; enemies.push({ x: canvas.width/2, y: -250, size: 100, bs: 0.4, speed: 0.4, hp: 100*hpMultiplier*150, maxHp: 100*hpMultiplier*150, bTimer: 0, type: 'img', img: boss1Img, isBoss: true, bossType: 1, attackTimer: 0, invulTimer: 0, hasTriggeredInvul: false, isEntering: true }); }
-            if (level >= 50 && !boss2Spawned) { boss2Spawned = true; enemies.push({ x: canvas.width/2, y: -250, size: 100, bs: 0.5, speed: 0.5, hp: 100*hpMultiplier*250, maxHp: 100*hpMultiplier*250, bTimer: 0, type: 'img', img: nvidaImg, isBoss: true, bossType: 2, attackTimer: 0, invulTimer: 0, hasTriggeredInvul: false, isEntering: true }); }
-            if (level >= 60 && !boss3Spawned) { boss3Spawned = true; enemies.push({ x: canvas.width/2, y: -250, size: 100, bs: 0.6, speed: 0.6, hp: 100*hpMultiplier*500, maxHp: 100*hpMultiplier*500, bTimer: 0, type: 'img', img: mkImg, isBoss: true, bossType: 3, attackTimer: 0, invulTimer: 0, hasTriggeredInvul: false, isEntering: true }); }
-            if (level >= 70 && !boss4Spawned) { boss4Spawned = true; enemies.push({ x: canvas.width/2, y: -250, size: 100, bs: 0.45, speed: 0.45, hp: 100*hpMultiplier*600, maxHp: 100*hpMultiplier*600, bTimer: 0, type: 'img', img: boss4Img, isBoss: true, bossType: 4, attackTimer: 0, invulTimer: 0, hasTriggeredInvul: false, isEntering: true }); }
-            if (level >= 80 && !boss5Spawned) { boss5Spawned = true; enemies.push({ x: canvas.width/2, y: -250, size: 40, bs: 0.1, speed: 0.1, hp: 100*hpMultiplier*1000, maxHp: 100*hpMultiplier*1000, bTimer: 0, type: 'img', img: flImg, isBoss: true, bossType: 5, attackTimer: 0, invulTimer: 0, hasTriggeredInvul: false, isEntering: true, hideHpBar: true, castZoltraak: 0 }); }
-            if (level >= 90 && !boss6Spawned) { boss6Spawned = true; enemies.push({ x: canvas.width/2, y: -250, size: 80, bs: 0.8, speed: 0.8, hp: 100*hpMultiplier*2000, maxHp: 100*hpMultiplier*2000, bTimer: 0, type: 'img', img: boss6Img, isBoss: true, bossType: 6, attackTimer: 0, invulTimer: 0, hasTriggeredInvul: false, isEntering: true, hasTriggeredVoid: false }); }
+            if (level >= 40 && !boss1Spawned) { boss1Spawned = true; enemies.push({ x: canvas.width/2, y: -250, size: 50, bs: 0.4, speed: 0.4, hp: 100*hpMultiplier*150, maxHp: 100*hpMultiplier*150, bTimer: 0, type: 'img', img: boss1Img, isBoss: true, bossType: 1, attackTimer: 0, invulTimer: 0, hasTriggeredInvul: false, isEntering: true }); }
+            if (level >= 50 && !boss2Spawned) { boss2Spawned = true; enemies.push({ x: canvas.width/2, y: -250, size: 50, bs: 0.5, speed: 0.5, hp: 100*hpMultiplier*250, maxHp: 100*hpMultiplier*250, bTimer: 0, type: 'img', img: nvidaImg, isBoss: true, bossType: 2, attackTimer: 0, invulTimer: 0, hasTriggeredInvul: false, isEntering: true }); }
+            if (level >= 60 && !boss3Spawned) { boss3Spawned = true; enemies.push({ x: canvas.width/2, y: -250, size: 50, bs: 0.6, speed: 0.6, hp: 100*hpMultiplier*500, maxHp: 100*hpMultiplier*500, bTimer: 0, type: 'img', img: mkImg, isBoss: true, bossType: 3, attackTimer: 0, invulTimer: 0, hasTriggeredInvul: false, isEntering: true }); }
+            if (level >= 70 && !boss4Spawned) { boss4Spawned = true; enemies.push({ x: canvas.width/2, y: -250, size: 50, bs: 0.45, speed: 0.45, hp: 100*hpMultiplier*600, maxHp: 100*hpMultiplier*600, bTimer: 0, type: 'img', img: boss4Img, isBoss: true, bossType: 4, attackTimer: 0, invulTimer: 0, hasTriggeredInvul: false, isEntering: true }); }
+            if (level >= 80 && !boss5Spawned) { boss5Spawned = true; enemies.push({ x: canvas.width/2, y: -250, size: 30, bs: 0.1, speed: 0.1, hp: 100*hpMultiplier*1000, maxHp: 100*hpMultiplier*1000, bTimer: 0, type: 'img', img: flImg, isBoss: true, bossType: 5, attackTimer: 0, invulTimer: 0, hasTriggeredInvul: false, isEntering: true, hideHpBar: true, castZoltraak: 0 }); }
+            if (level >= 90 && !boss6Spawned) { boss6Spawned = true; enemies.push({ x: canvas.width/2, y: -250, size: 60, bs: 0.8, speed: 0.8, hp: 100*hpMultiplier*2000, maxHp: 100*hpMultiplier*2000, bTimer: 0, type: 'img', img: boss6Img, isBoss: true, bossType: 6, attackTimer: 0, invulTimer: 0, hasTriggeredInvul: false, isEntering: true, hasTriggeredVoid: false }); }
             
             if (level >= 100 && !boss7Spawned) {
                 boss7Spawned = true;
                 enemies.length = 0; 
                 bossBullets.length = 0;
-                enemies.push({ x: canvas.width/2, y: -250, size: 120, bs: 0.3, speed: 0.3, hp: 100*hpMultiplier*10000, maxHp: 100*hpMultiplier*10000, bTimer: 0, type: 'img', img: trumpImg, isBoss: true, bossType: 7, attackTimer: 0, invulTimer: 0, hasTriggeredInvul: false, isEntering: true, hasTriggeredTariff: false });
+                enemies.push({ x: canvas.width/2, y: -250, size: 80, bs: 0.3, speed: 0.3, hp: 100*hpMultiplier*10000, maxHp: 100*hpMultiplier*10000, bTimer: 0, type: 'img', img: trumpImg, isBoss: true, bossType: 7, attackTimer: 0, invulTimer: 0, hasTriggeredInvul: false, isEntering: true, hasTriggeredTariff: false });
             }
 
             let effectiveLevelForSpawn = Math.min(level, 60); let spawnTier = Math.floor(effectiveLevelForSpawn / 10);
@@ -976,7 +980,7 @@
                 goblinSpawnCount++; let spawnLimit = level >= 85 ? 3 : 1;
                 for (let g = 0; g < spawnLimit; g++) {
                     let ex = Math.random()<0.5 ? -60 : canvas.width+60; let ey = Math.random()*canvas.height;
-                    enemies.push({ x: ex, y: ey, size: 50, bs: 0.8, speed: 0.8, hp: 100*hpMultiplier*10, maxHp: 100*hpMultiplier*10, bTimer: 0, type: 'img', img: linImg, isGoblin: true, isEntering: true });
+                    enemies.push({ x: ex, y: ey, size: 30, bs: 0.8, speed: 0.8, hp: 100*hpMultiplier*10, maxHp: 100*hpMultiplier*10, bTimer: 0, type: 'img', img: linImg, isGoblin: true, isEntering: true });
                 }
             }
 
@@ -996,7 +1000,7 @@
                 if (player.hasBoss5Skill) enemyPool.push({ type: 'img', img: flImg, hp: miniHp, isMini: true, bType: 5, hideHpBar: true });
 
                 let selectedEnemy = enemyPool[Math.floor(Math.random() * enemyPool.length)];
-                let newEnemy = { x: ex, y: ey, size: 40, bs: spd, speed: spd, hp: selectedEnemy.hp, maxHp: selectedEnemy.hp, bTimer: 0, type: selectedEnemy.type, isEntering: true };
+                let newEnemy = { x: ex, y: ey, size: 20, bs: spd, speed: spd, hp: selectedEnemy.hp, maxHp: selectedEnemy.hp, bTimer: 0, type: selectedEnemy.type, isEntering: true };
 
                 if (selectedEnemy.type === 'emoji') newEnemy.emoji = animalZombies[Math.floor(Math.random()*animalZombies.length)];
                 else { newEnemy.img = selectedEnemy.img; if (selectedEnemy.hideHpBar) newEnemy.hideHpBar = true; }
@@ -1367,12 +1371,12 @@
                     if (e.img && e.img.complete && e.img.naturalHeight !== 0) {
                         const ar = e.img.naturalWidth / e.img.naturalHeight; let tw = 100;
                         if (e.isBoss) {
-                            if (e.bossType === 3 || e.bossType === 4 || e.bossType === 1 || e.bossType === 2) tw = 250; 
-                            else if (e.bossType === 5) tw = 120;
-                            else if (e.bossType === 6) tw = 200; 
-                            else if (e.bossType === 7) tw = 300;
-                        } else if (e.isMiniBoss && e.bossType === 5) tw = 80;
-                        const th = tw / ar; ctx.drawImage(e.img, e.x - tw/2, e.y - th/2, tw, th);
+                            if (e.bossType === 3 || e.bossType === 4 || e.bossType === 1 || e.bossType === 2) tw = 125; 
+                            else if (e.bossType === 5) tw = 60;
+                            else if (e.bossType === 6) tw = 100; 
+                            else if (e.bossType === 7) tw = 150;
+                        } else if (e.isMiniBoss && e.bossType === 5) tw = 50;
+                        ctx.drawImage(e.img, e.x - (tw*0.5)/2, e.y - (th*0.5)/2, tw*0.5, th*0.5);
                     }
                 }
                 
@@ -1524,15 +1528,15 @@
             }
 
             if (playerImg.complete && playerImg.naturalHeight !== 0) {
-                const ar = playerImg.naturalWidth / playerImg.naturalHeight; const tw = 160; const th = tw/ar;
+                const ar = playerImg.naturalWidth / playerImg.naturalHeight; const tw = 160 * 0.5; const th = (160 / ar) * 0.5;
                 if (player.invulTimer > 0 && frameCount % 10 < 5) ctx.globalAlpha = 0.5;
                 ctx.drawImage(playerImg, player.x - tw/2, player.y - th/2, tw, th); ctx.globalAlpha = 1.0;
             }
 
             if (player.shield > 0) {
-                ctx.beginPath(); ctx.arc(player.x, player.y, player.collisionRadius + 10, 0, Math.PI * 2);
+                ctx.beginPath(); ctx.arc(player.x, player.y, player.collisionRadius + 5, 0, Math.PI * 2);
                 ctx.strokeStyle = 'rgba(46, 204, 113, 0.8)'; ctx.lineWidth = 4; ctx.stroke();
-                ctx.fillStyle = '#2ecc71'; ctx.font = 'bold 16px Arial'; ctx.fillText(`x${player.shield}`, player.x + player.collisionRadius, player.y - player.collisionRadius);
+                ctx.fillStyle = '#2ecc71'; ctx.font = 'bold 16px Arial'; ctx.fillText(`x${player.shield}`, player.x + player.collisionRadius + 5, player.y - player.collisionRadius);
             }
 
             if (player.shoutTimer>0) {
