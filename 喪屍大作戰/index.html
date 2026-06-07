@@ -1,0 +1,1451 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>台北市倖存者：萃比的咖啡防衛戰 (極速走位版)</title>
+    <style>
+        body {
+            margin: 0; overflow: hidden; background-color: #1a252c;
+            display: flex; justify-content: center; align-items: center;
+            height: 100vh; color: white; font-family: '微軟正黑體', sans-serif;
+            user-select: none;
+        }
+        canvas { background-color: #2c3e50; display: block; }
+        
+        #upgradeScreen {
+            position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0, 0, 0, 0.85); display: none; 
+            flex-direction: column; justify-content: center; align-items: center; z-index: 100;
+        }
+        #upgradeScreen h1 { color: #f1c40f; text-shadow: 0 0 10px #f39c12; font-size: 48px; margin-bottom: 40px;}
+        .cards-container { display: flex; gap: 20px; }
+        .card {
+            background: linear-gradient(135deg, #ecf0f1 0%, #bdc3c7 100%);
+            width: 260px; height: 380px; border-radius: 15px; padding: 20px;
+            box-sizing: border-box; cursor: pointer; color: #2c3e50;
+            display: flex; flex-direction: column; justify-content: space-between;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5); transition: transform 0.2s, box-shadow 0.2s;
+            border: 4px solid #fff;
+        }
+        .card:hover { transform: translateY(-10px); box-shadow: 0 15px 30px rgba(241, 196, 15, 0.5); border-color: #f1c40f; }
+        .card.new-skill { background: linear-gradient(135deg, #f3e5ab 0%, #d4c48a 100%); }
+        .card-header { font-size: 22px; font-weight: bold; text-align: center; border-bottom: 2px solid rgba(0,0,0,0.1); padding-bottom: 10px;}
+        .card-type { font-size: 14px; color: #7f8c8d; text-align: center; margin-bottom: 15px; text-transform: uppercase;}
+        .card-desc { font-size: 16px; flex-grow: 1; display: flex; align-items: center; text-align: justify; line-height: 1.5;}
+
+        #infoScreen {
+            position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0, 0, 0, 0.9); display: none; 
+            flex-direction: column; justify-content: center; align-items: center; z-index: 150;
+        }
+        #infoScreen h1 { color: #f1c40f; text-shadow: 0 0 20px #f39c12; font-size: 60px; margin-bottom: 20px;}
+        #infoScreen h2 { color: #2ecc71; font-size: 32px; margin-bottom: 40px; font-weight: normal;}
+        .info-box {
+            background: rgba(255, 255, 255, 0.1); border: 2px solid #f1c40f; border-radius: 15px;
+            padding: 30px; max-width: 650px; text-align: center; margin-bottom: 50px;
+        }
+        .info-box p { font-size: 22px; line-height: 1.8; margin: 15px 0; color: #ecf0f1;}
+        .info-box strong { color: #f39c12; }
+        .info-box .skill-text { color: #3498db; font-weight: bold; }
+        #btnContinueInfo {
+            background: linear-gradient(135deg, #f1c40f 0%, #e67e22 100%);
+            color: #fff; font-size: 24px; font-weight: bold; font-family: '微軟正黑體';
+            padding: 15px 40px; border: none; border-radius: 50px; cursor: pointer;
+            box-shadow: 0 5px 15px rgba(243, 156, 18, 0.4); transition: transform 0.2s;
+        }
+        #btnContinueInfo:hover { transform: scale(1.05); }
+    </style>
+</head>
+<body>
+
+    <img id="img_cuibi" src="cuibi.png" style="display:none;">
+    <img id="img_work1" src="work1.png" style="display:none;">
+    <img id="img_work2" src="work2.png" style="display:none;">
+    <img id="img_momo" src="momo.png" style="display:none;">
+    <img id="img_boss1" src="boss1.png" style="display:none;">
+    <img id="img_lin" src="lin.png" style="display:none;">
+    <img id="img_nvida" src="nvida.png" style="display:none;">
+    <img id="img_mk" src="mk.png" style="display:none;">
+    <img id="img_8zz" src="8zz.png" style="display:none;">
+    <img id="img_fl" src="fl.png" style="display:none;">
+    <img id="img_5t5" src="5t5.png" style="display:none;">
+    <img id="img_trump" src="tru.png" style="display:none;">
+
+    <div id="upgradeScreen">
+        <h1>職人選單 (等級提升)</h1>
+        <div class="cards-container" id="cardsContainer"></div>
+    </div>
+
+    <div id="infoScreen">
+        <h1 id="infoTitle">標題</h1>
+        <h2 id="infoSubtitle">副標題</h2>
+        <div class="info-box" id="infoBox">
+            <p id="infoDesc"></p>
+        </div>
+        <button id="btnContinueInfo" onclick="resumeFromInfo()">繼續戰鬥</button>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const upgradeScreen = document.getElementById('upgradeScreen');
+        const cardsContainer = document.getElementById('cardsContainer');
+        const infoScreen = document.getElementById('infoScreen');
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+            if (player && player.x) {
+                player.x = Math.max(player.collisionRadius, Math.min(canvas.width - player.collisionRadius, player.x));
+                player.y = Math.max(player.collisionRadius, Math.min(canvas.height - player.collisionRadius - 60, player.y));
+            }
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        const playerImg = document.getElementById('img_cuibi');
+        const work1Img = document.getElementById('img_work1');
+        const work2Img = document.getElementById('img_work2');
+        const momoImg = document.getElementById('img_momo');
+        const boss1Img = document.getElementById('img_boss1');
+        const linImg = document.getElementById('img_lin');
+        const nvidaImg = document.getElementById('img_nvida');
+        const mkImg = document.getElementById('img_mk');
+        const boss4Img = document.getElementById('img_8zz');
+        const flImg = document.getElementById('img_fl');
+        const boss6Img = document.getElementById('img_5t5');
+        const trumpImg = document.getElementById('img_trump');
+
+        let score = 0; let level = 1; let frameCount = 0;
+        let isPaused = false; let isUpgrading = false; let isInfoMenu = false; 
+        let shotsFired = 0;
+        let boss1Spawned = false; let boss2Spawned = false; let boss3Spawned = false;
+        let boss4Spawned = false; let boss5Spawned = false; let boss6Spawned = false;
+        let boss7Spawned = false; 
+        let hasWon = false; 
+        let isUltimateReady = false;
+        
+        let currentExp = 0;
+        let expToNextLevel = 20;
+        let pendingUpgrades = 0;
+        let postUltDelay = 0;
+        
+        let killCountForGoblin = 0;
+        let nextGoblinThreshold = 100;
+        let goblinSpawnCount = 0;
+        let controlsInverted = 0;
+
+        let isUIHidden = 0;
+        let isTariffActive = false;
+        const twitterBirds = [];
+        const trumpWalls = [];
+
+        const player = { 
+            x: 0, y: 0, lastX: 0, lastY: 0, collisionRadius: 40, speed: 1.5, hp: 500, maxHp: 500, baseCritRate: 0.05, 
+            shoutTimer: 0, shoutText: "",
+            hasBoss1Skill: false, hasBoss2Skill: false, boss2Timer: 0,
+            hasHoming: false, hasBoss3Skill: false, boss3Timer: 0,
+            damageMultiplier: 1,
+            hasBoss4Skill: false, shield: 0, killsSinceHeal: 0, redKCooldown: 0, invulTimer: 0,
+            hasBoss5Skill: false, boss5Timer: 0,
+            hasCaffeineFever: false, caffeineStacks: 0, caffeineDecayTimer: 0,
+            hasStarRing: false, starRingAngle: 0,
+            hasLimitless: false, limitlessShieldTimer: 0, hollowPurpleTimer: 0,
+            revives: 0,
+            ultimateUpgraded: false,
+            caffeineUpgraded: false
+        };
+
+        function getEffectiveDamageMult() {
+            let mult = player.damageMultiplier; 
+            if (player.hasCaffeineFever) {
+                let buffPerStack = player.caffeineUpgraded ? 0.20 : 0.085;
+                mult += (player.caffeineStacks * buffPerStack);
+            }
+            return mult;
+        }
+
+        resizeCanvas(); player.x = canvas.width / 2; player.y = canvas.height / 2;
+        player.lastX = player.x; player.lastY = player.y;
+
+        const bullets = []; const enemies = []; const damageNumbers = []; const iceZones = []; const explosions = []; const ultimates = [];
+        const ultParticles = []; const bossBullets = [];
+        const cyberTrucks = []; const starlinks = []; const xRays = []; 
+        const kPillars = []; const mimicChests = []; const zoltraaks = []; const blackHoles = [];
+        const animalZombies = ['🐼', '🦊', '🐰', '🐯', '🐷'];
+
+        const SKILL_TYPES = { AMERICANO: 'americano', LATTE: 'latte', COLD_BREW: 'coldBrew', AEROPRESS: 'aeropress', ULULTIMATE: 'ultimate' };
+
+        const skillData = {
+            [SKILL_TYPES.AMERICANO]: {
+                name: "美式咖啡", desc: "單點突破，發射高初速外帶杯。(基礎穿透70%)", isLearned: true, lastFiredFrame: 0, baseCooldown: 60,
+                upgrades: [
+                    { id: 'am_pierce_100', name: "完美穿透", desc: "穿透率提升至 100%。", maxLevel: 1, currentLevel: 0, req: [] },
+                    { id: 'am_multi_3', name: "吧台大單", desc: "一次射出 6 杯美式咖啡。", maxLevel: 1, currentLevel: 0, req: [] }, 
+                    { id: 'am_dmg_after_pierce', name: "穿透增壓", desc: "穿透後，傷害加倍。", maxLevel: 1, currentLevel: 0, req: [] },
+                    { id: 'am_crit_100', name: "完美萃取", desc: "美式必定觸發爆擊。", maxLevel: 1, currentLevel: 0, req: [] },
+                    { id: 'am_ice_slow', name: "大杯冰美式", desc: "擊中喪屍降速 30%。", maxLevel: 1, currentLevel: 0, req: [] },
+                    { id: 'am_crit_dmg_stack', name: "風味累積", desc: "美式爆傷變為2倍。", maxLevel: 1, currentLevel: 0, req: [] },
+                    { id: 'am_speed_up', name: "研磨加速", desc: "出杯速度加倍。", maxLevel: 1, currentLevel: 0, req: [] },
+                    { id: 'am_dmg_burn', name: "深焙焦香", desc: "對「燙傷」敵人傷害2倍。", maxLevel: 1, currentLevel: 0, req: [] }
+                ]
+            },
+            [SKILL_TYPES.LATTE]: {
+                name: "拿鐵咖啡", desc: "核心爆發，命中大範圍濺射，並附帶高溫燙傷。", isLearned: false, lastFiredFrame: 0, baseCooldown: 120,
+                upgrades: [
+                    { id: 'la_speed_up', name: "蒸奶加速", desc: "拿鐵出杯速度加倍。", maxLevel: 1, currentLevel: 0, req: [] },
+                    { id: 'la_multi_3', name: "拉花套餐", desc: "一次發射 6 杯拿鐵。", maxLevel: 1, currentLevel: 0, req: [] },
+                    { id: 'la_aoe_range', name: "奶泡擴散", desc: "濺射爆炸範圍再2倍。", maxLevel: 1, currentLevel: 0, req: [] },
+                    { id: 'la_aoe_dmg', name: "厚乳濃郁", desc: "濺射傷害變成2倍。", maxLevel: 1, currentLevel: 0, req: [] },
+                    { id: 'la_knockback', name: "重擊奶泡", desc: "濺射附帶擊退效果。", maxLevel: 1, currentLevel: 0, req: [] },
+                    { id: 'la_knockback_dist', name: "杯身推擠", desc: "擊退距離變成2倍。", maxLevel: 1, currentLevel: 0, req: ['la_knockback'] }
+                ]
+            },
+            [SKILL_TYPES.COLD_BREW]: {
+                name: "冰滴咖啡", desc: "持續控場，落下冰塊形成減速領域。", isLearned: false, lastFiredFrame: 0, baseCooldown: 210,
+                upgrades: [
+                    { id: 'cb_duration_dmg', name: "低溫慢釀", desc: "領域延長3秒，附加凍傷。", maxLevel: 1, currentLevel: 0, req: [] },
+                    { id: 'cb_blackhole', name: "巨冰引力", desc: "碎裂前，吸附周圍喪屍。", maxLevel: 1, currentLevel: 0, req: [] },
+                    { id: 'cb_speed_up', name: "點滴加速", desc: "發射速度2倍。", maxLevel: 1, currentLevel: 0, req: [] },
+                    { id: 'cb_multi_2', name: "雙軌冰滴", desc: "一次落下2台冰滴壺。", maxLevel: 1, currentLevel: 0, req: [] },
+                    { id: 'cb_dmg_up', name: "極地嚴寒", desc: "凍傷傷害2倍。", maxLevel: 1, currentLevel: 0, req: ['cb_duration_dmg'] },
+                    { id: 'cb_range_up', name: "領域展開", desc: "冷凝區域範圍2倍。", maxLevel: 1, currentLevel: 0, req: [] },
+                    { id: 'cb_pull_range', name: "引力潮汐", desc: "聚怪引力範圍2倍。", maxLevel: 1, currentLevel: 0, req: ['cb_blackhole'] },
+                    { id: 'cb_dmg_burn', name: "冰火淬鍊", desc: "對「燙傷」敵人凍傷3倍。", maxLevel: 1, currentLevel: 0, req: ['cb_duration_dmg'] }
+                ]
+            },
+            [SKILL_TYPES.AEROPRESS]: {
+                name: "愛樂壓氣動波", desc: "高壓榨取！發射巨大空氣水彈貫穿並暴力擊退路徑上的所有喪屍。", isLearned: false, lastFiredFrame: 0, baseCooldown: 240,
+                upgrades: [
+                    { id: 'ap_size', name: "加大濾壓", desc: "衝擊波體積變成 2 倍。", maxLevel: 1, currentLevel: 0, req: [] },
+                    { id: 'ap_dmg', name: "極限高壓", desc: "氣動波傷害變成 3 倍。", maxLevel: 1, currentLevel: 0, req: [] },
+                    { id: 'ap_knockback', name: "暴風排氣", desc: "擊退距離大幅增加。", maxLevel: 1, currentLevel: 0, req: [] },
+                    { id: 'ap_cd_down', name: "快速填壓", desc: "冷卻時間縮短 30%。", maxLevel: 1, currentLevel: 0, req: [] },
+                    { id: 'ap_stun', name: "腦震盪萃取", desc: "被擊退的喪屍會暈眩減速 2 秒。", maxLevel: 1, currentLevel: 0, req: ['ap_knockback'] }
+                ]
+            },
+            [SKILL_TYPES.ULULTIMATE]: {
+                name: "終極拉花大師", desc: "【35級自動解鎖】全螢幕毀滅性拉花。", isLearned: false, lastFiredFrame: 0, baseCooldown: 1200, 
+                upgrades: [] 
+            }
+        };
+
+        const keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowLeft: false, ArrowDown: false, ArrowRight: false, " ": false };
+        window.addEventListener('keydown', e => { 
+            if(e.key === " ") { keys[" "] = true; e.preventDefault(); }
+            else if(keys.hasOwnProperty(e.key)) keys[e.key] = true; 
+            if (e.key.toLowerCase() === 'p' && !isUpgrading && !isInfoMenu && player.hp > 0 && !hasWon) isPaused = !isPaused;
+        });
+        window.addEventListener('keyup', e => { 
+            if(e.key === " ") keys[" "] = false;
+            else if(keys.hasOwnProperty(e.key)) keys[e.key] = false; 
+        });
+
+        function getDistance(x1, y1, x2, y2) { return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2)); }
+
+        function formatDamage(num) {
+            if (num >= 100000000) return (num / 100000000).toFixed(1) + '億';
+            else if (num >= 10000) return (num / 10000).toFixed(1) + '萬';
+            return Math.floor(num).toString();
+        }
+
+        function takeDamage(amount) {
+            if (player.invulTimer > 0) return; 
+            if (player.shield > 0) { player.shield--; player.invulTimer = 30; return; }
+            player.hp -= amount; player.invulTimer = 30; 
+            
+            if (player.hp <= 0 && player.revives > 0) {
+                player.hp = player.maxHp; player.revives--; player.invulTimer = 180;
+                damageNumbers.push({x: player.x, y: player.y - 50, text: `👼 滿血復活！`, timer: 90, color: '#f1c40f'});
+                explosions.push({ x: player.x, y: player.y, maxRadius: 600, currentRadius: 10, alpha: 1.0 }); 
+                enemies.forEach(e => { if (getDistance(player.x, player.y, e.x, e.y) < 600 && !e.isBoss) e.hp = 0; });
+            }
+        }
+
+        function getAvailableNewSkills() { return Object.keys(skillData).filter(k => !skillData[k].isLearned && k !== SKILL_TYPES.ULULTIMATE); } 
+        function getAvailableUpgrades() {
+            let available = [];
+            for (const key in skillData) {
+                if (skillData[key].isLearned) {
+                    skillData[key].upgrades.forEach(u => {
+                        if (u.currentLevel < u.maxLevel && u.req.every(rId => skillData[key].upgrades.find(r => r.id === rId).currentLevel > 0)) {
+                            available.push({ skillKey: key, skillName: skillData[key].name, upgrade: u });
+                        }
+                    });
+                }
+            } return available;
+        }
+
+        function triggerUpgradeScreen() {
+            isPaused = true; isUpgrading = true; cardsContainer.innerHTML = '';
+            const drawn = [];
+            for (let i=0; i<3; i++) {
+                let aNew = getAvailableNewSkills().filter(k => !drawn.some(c => c.type === 'NEW' && c.data === k));
+                let aUpg = getAvailableUpgrades().filter(u => !drawn.some(c => c.type === 'UPGRADE' && c.data.upgrade.id === u.upgrade.id));
+                let type = 'UPGRADE';
+                if (aNew.length > 0 && Math.random() < 0.4) type = 'NEW';
+                if (type === 'NEW' && aNew.length === 0) type = 'UPGRADE';
+                if (type === 'UPGRADE' && aUpg.length === 0) type = 'NEW';
+                if (aNew.length === 0 && aUpg.length === 0) break;
+
+                if (type === 'NEW') {
+                    let r = aNew[Math.floor(Math.random() * aNew.length)]; drawn.push({type:'NEW', data:r}); createCardUI('NEW', r);
+                } else {
+                    let r = aUpg[Math.floor(Math.random() * aUpg.length)]; drawn.push({type:'UPGRADE', data:r}); createCardUI('UPGRADE', r);
+                }
+            }
+            if (drawn.length === 0) { resumeGame(); return; }
+            upgradeScreen.style.display = 'flex';
+        }
+
+        function createCardUI(type, data) {
+            const card = document.createElement('div'); card.className = 'card';
+            let head, typeTxt, desc;
+            if (type === 'NEW') {
+                card.classList.add('new-skill'); typeTxt = '解鎖新基本技能'; head = skillData[data].name; desc = skillData[data].desc;
+                card.onclick = () => { skillData[data].isLearned = true; resumeGame(); };
+            } else {
+                typeTxt = `強化：${data.skillName}`; head = data.upgrade.name; desc = `${data.upgrade.desc}`; 
+                card.onclick = () => { data.upgrade.currentLevel++; resumeGame(); };
+            }
+            card.innerHTML = `<div class="card-type">${typeTxt}</div><div class="card-header">${head}</div><div class="card-desc">${desc}</div>`;
+            cardsContainer.appendChild(card);
+        }
+
+        function resumeGame() { upgradeScreen.style.display = 'none'; isPaused = false; isUpgrading = false; }
+        function getUpg(s, uId) { const u = skillData[s].upgrades.find(x => x.id === uId); return u ? u.currentLevel : 0; }
+
+        function triggerInfoScreen(type) {
+            isPaused = true; isInfoMenu = true;
+            const title = document.getElementById('infoTitle');
+            const subtitle = document.getElementById('infoSubtitle');
+            const desc = document.getElementById('infoDesc');
+
+            if (type === 'boss1') {
+                title.innerText = "✨ 擊敗 40 級守門員！"; subtitle.innerText = "❤️ 萃比的體力已完全恢復 ❤️";
+                desc.innerHTML = "<strong>【永久增益：職人覺醒】</strong><br>基礎移動速度增加 6 倍！基礎暴擊率提升 10%。<br><br><span class='skill-text'>【奪取技能：高溫烘焙領域】</span><br>自動在身邊產生金色的火焰結界，對範圍內敵人持續造成灼燒傷害。";
+                player.speed *= 6; player.baseCritRate += 0.10; player.hasBoss1Skill = true; player.hp = player.maxHp;
+            } else if (type === 'boss2') {
+                title.innerText = "🌟 擊敗 50 級 AI 教父！"; subtitle.innerText = "❤️ 萃比的體力已完全恢復 ❤️";
+                desc.innerHTML = "<strong>【永久增益：黃氏算力超頻】</strong><br>所有基礎招式冷卻時間永久縮短 30%。<br><br><span class='skill-text'>【奪取技能：算力綠色彈幕】</span><br>每 3 秒自動向四周爆發一圈強大的綠色破壞晶片彈幕。";
+                skillData[SKILL_TYPES.AMERICANO].baseCooldown *= 0.7; skillData[SKILL_TYPES.LATTE].baseCooldown *= 0.7;
+                skillData[SKILL_TYPES.COLD_BREW].baseCooldown *= 0.7; skillData[SKILL_TYPES.AEROPRESS].baseCooldown *= 0.7;
+                player.hasBoss2Skill = true; player.hp = player.maxHp;
+            } else if (type === 'boss3') {
+                title.innerText = "🚀 擊敗 60 級火星拓荒者！"; subtitle.innerText = "❤️ 萃比的體力已完全恢復 ❤️";
+                desc.innerHTML = "<strong>【永久增益：Neuralink 腦機介面】</strong><br>所有射擊招式獲得「微調自動追蹤」能力。<br><br><span class='skill-text'>【奪取技能：X 軌道死光】</span><br>每 20 秒呼叫軌道兵器，以萃比為中心發射巨大 X 型死光，瞬間秒殺一般雜魚。";
+                player.hasHoming = true; player.hasBoss3Skill = true; player.hp = player.maxHp;
+            } else if (type === 'boss4') {
+                title.innerText = "📉 擊敗 70 級股市冥燈！"; subtitle.innerText = "❤️ 萃比的體力已完全恢復 ❤️";
+                desc.innerHTML = "<strong>【永久增益：高股息複利護體】</strong><br>每擊殺 100 隻怪物，自動回復 10% 血量並獲得抵擋一次傷害的「配息護盾」。<br><br><span class='skill-text'>【奪取技能：萬點紅 K 爆發】</span><br>當血量低於 30% 時，自動爆發超巨大紅K線清空全場並獲得無敵！(冷卻 60 秒)<br><br><span style='color:#f1c40f;font-weight:bold;'>🌟 通關獎勵：獲得 1 次滿血復活機會！</span>";
+                player.hasBoss4Skill = true; player.hp = player.maxHp; player.revives++;
+            } else if (type === 'boss5') {
+                title.innerText = "🧝‍♀️ 擊敗 80 級葬送的魔法使！"; subtitle.innerText = "❤️ 萃比的體力已完全恢復 ❤️";
+                desc.innerHTML = "<strong>【永久增益：精靈的體感時間】</strong><br>全場所有敵人的移動速度永久強制降低 20%。<br><br><span class='skill-text'>【奪取技能：一般攻擊魔法】</span><br>每 30 秒自動鎖定全場血量最高的敵人，發射一發無視障礙與護盾的直線貫穿光砲。<br><br><span style='color:#f1c40f;font-weight:bold;'>🌟 通關獎勵：獲得 1 次滿血復活機會！</span>";
+                player.hasBoss5Skill = true; player.hp = player.maxHp; player.revives++;
+            } else if (type === 'boss6') {
+                title.innerText = "🤞 擊敗 90 級異世界最強！"; subtitle.innerText = "🌌 領悟了手沖的無下限 🌌";
+                desc.innerHTML = "<strong>【永久增益：六眼・手沖黃金比例】</strong><br>全場喪屍與彈幕速度永久減半！每 10 秒自動獲得一次絕對防禦護盾。<br><br><span class='skill-text'>【奪取技能：虛式「極萃」】</span><br>每 60 秒自動發射一顆「紫色黑洞」，將路徑上的喪屍全部吸入抹除！<br><br><span style='color:#f1c40f;font-weight:bold;'>🌟 通關獎勵：獲得 1 次滿血復活機會！</span>";
+                player.hasLimitless = true; player.hp = player.maxHp; player.revives++;
+            } else if (type === 'caffeine') {
+                title.innerText = "🔥 55 級覺醒：咖啡因狂熱！"; subtitle.innerText = "☕ 越殺越瘋，傷害突破天際 ☕";
+                desc.innerHTML = "<strong>【被動大絕：咖啡因狂熱】</strong><br>每擊殺 1 名敵人獲得 1 層狂熱，最高疊加 40 層！每層提升 8.5% 總傷害。<br><br><span style='color:#f1c40f;font-weight:bold;font-size:24px;'>🌟 連鎖共鳴：【終極拉花大師】獲得終極強化！<br>(冷卻強制減半、基礎傷害暴增5倍、必定爆擊且爆傷3倍、附帶高溫燙傷)</span>";
+                player.hasCaffeineFever = true; player.ultimateUpgraded = true; player.hp = player.maxHp;
+            } else if (type === 'starRing') {
+                title.innerText = "🌪️ 75 級覺醒：COCA 濾杯星環！"; subtitle.innerText = "☕ 絕對防禦的近戰絞肉機 ☕";
+                desc.innerHTML = "<strong>【被動大絕：濾杯星環】</strong><br>自動召喚 5 個高速旋轉的高溫濾杯環繞身邊！將所有靠近的敵人無情絞碎，且不受空間減速影響！<br><br><span style='color:#f1c40f;font-weight:bold;font-size:24px;'>🌟 連鎖共鳴：【咖啡因狂熱】獲得終極強化！<br>(狂熱疊加層數上限從 40 突破至 100 層！每層傷害加成從 8.5% 暴增至 20%！)</span>";
+                player.hasStarRing = true; player.caffeineUpgraded = true; player.hp = player.maxHp;
+            } else if (type === 'goblin') {
+                title.innerText = "👺 擊殺黃金哥布林！"; subtitle.innerText = "💰 獲得超神級財富密碼 💰";
+                desc.innerHTML = "<strong>【永久增益：兩倍爆發與強健體魄】</strong><br>所有攻擊最終傷害永久變成 2 倍！<br>血量上限永久 +100，並瞬間恢復全部體力！";
+                player.damageMultiplier *= 2; player.maxHp += 100; player.hp = player.maxHp;
+            } else if (type === 'ultimate') {
+                title.innerText = "☕ 萃比覺醒！"; subtitle.innerText = "✨ 達到 35 級，解鎖隱藏潛能 ✨";
+                desc.innerHTML = "<strong>【解鎖大絕招：終極拉花大師】</strong><br>螢幕右下角能量條集滿時，按下 <strong style='color:#f1c40f;font-size:26px;'>[空白鍵 SPACE]</strong>，可釋放全螢幕毀滅性拉花攻擊！";
+            }
+            infoScreen.style.display = 'flex';
+        }
+
+        function resumeFromInfo() { infoScreen.style.display = 'none'; isInfoMenu = false; isPaused = false; }
+        
+        function getEnemyMargin(e) {
+            let marginX = e.size, marginY = e.size;
+            if (e.type !== 'emoji') {
+                let tw = 100;
+                if (e.isBoss) {
+                    if (e.bossType === 3 || e.bossType === 4 || e.bossType === 1 || e.bossType === 2) tw = 250; 
+                    else if (e.bossType === 5) tw = 120;
+                    else if (e.bossType === 6) tw = 200; 
+                    else if (e.bossType === 7) tw = 300;
+                } else if (e.isMiniBoss && e.bossType === 5) tw = 80;
+                marginX = tw / 2;
+                if (e.img && e.img.complete && e.img.naturalHeight) marginY = (tw / (e.img.naturalWidth / e.img.naturalHeight)) / 2;
+                else marginY = marginX;
+            } else { marginX = 30; marginY = 30; }
+            return {x: marginX, y: marginY};
+        }
+
+        function update() {
+            if (player.hp <= 0 || isPaused || hasWon) return;
+
+            let scaleTier = Math.floor(level / 10); let hpMultiplier = 1;
+            if (scaleTier < 3) hpMultiplier = Math.pow(3, scaleTier);
+            else if (scaleTier < 6) hpMultiplier = Math.pow(3, 2) * Math.pow(6, scaleTier - 2);
+            else if (scaleTier < 9) hpMultiplier = Math.pow(3, 2) * Math.pow(6, 3) * Math.pow(12, scaleTier - 5);
+            else hpMultiplier = Math.pow(3, 2) * Math.pow(6, 3) * Math.pow(12, 3) * Math.pow(24, scaleTier - 8);
+            
+            if (player.invulTimer > 0) player.invulTimer--;
+            if (player.redKCooldown > 0) player.redKCooldown--;
+            if (isUIHidden > 0) isUIHidden--;
+
+            if (ultimates.length > 0 || ultParticles.length > 0) postUltDelay = 60; 
+            else if (postUltDelay > 0) postUltDelay--; 
+
+            if (level >= 35 && !skillData[SKILL_TYPES.ULULTIMATE].isLearned) {
+                skillData[SKILL_TYPES.ULULTIMATE].isLearned = true;
+                skillData[SKILL_TYPES.ULULTIMATE].lastFiredFrame = frameCount - (player.ultimateUpgraded ? 600 : 1200);
+                triggerInfoScreen('ultimate');
+            }
+            if (level >= 55 && !player.hasCaffeineFever) triggerInfoScreen('caffeine');
+            if (level >= 75 && !player.hasStarRing) triggerInfoScreen('starRing');
+
+            if (player.hasCaffeineFever && player.caffeineStacks > 0) {
+                player.caffeineDecayTimer--;
+                if (player.caffeineDecayTimer <= 0) { player.caffeineStacks--; player.caffeineDecayTimer = player.caffeineStacks > 0 ? 30 : 0; }
+            }
+
+            if (player.hasLimitless) {
+                player.limitlessShieldTimer++;
+                if (player.limitlessShieldTimer >= 600) { player.shield++; player.limitlessShieldTimer = 0; }
+                player.hollowPurpleTimer++;
+                if (player.hollowPurpleTimer >= 3600) {
+                    player.hollowPurpleTimer = 0;
+                    let target = enemies.reduce((prev, current) => (prev.hp > current.hp) ? prev : current, enemies[0]);
+                    if (target) { let a = Math.atan2(target.y - player.y, target.x - player.x); blackHoles.push({x: player.x, y: player.y, angle: a, timer: 300, isPlayer: true}); }
+                }
+            }
+
+            player.lastX = player.x; player.lastY = player.y;
+
+            let moveX = 0, moveY = 0;
+            if (keys.w || keys.ArrowUp) moveY -= player.speed;
+            if (keys.s || keys.ArrowDown) moveY += player.speed;
+            if (keys.a || keys.ArrowLeft) moveX -= player.speed;
+            if (keys.d || keys.ArrowRight) moveX += player.speed;
+
+            if (controlsInverted > 0) { moveX = -moveX; moveY = -moveY; controlsInverted--; }
+
+            player.x += moveX; player.y += moveY;
+            player.x = Math.max(player.collisionRadius, Math.min(canvas.width - player.collisionRadius, player.x));
+            player.y = Math.max(player.collisionRadius, Math.min(canvas.height - player.collisionRadius - 60, player.y));
+
+            trumpWalls.forEach(w => {
+                let marginX = player.collisionRadius; let marginY = player.collisionRadius;
+                if (player.x + marginX > w.x && player.x - marginX < w.x + w.w &&
+                    player.y + marginY > w.y && player.y - marginY < w.y + w.h) {
+                    takeDamage(2); player.speed *= 0.5;
+                    let dx1 = player.x - w.x; let dx2 = w.x + w.w - player.x; let dy1 = player.y - w.y; let dy2 = w.y + w.h - player.y;
+                    let min = Math.min(dx1, dx2, dy1, dy2);
+                    if (min === dx1) player.x = w.x - marginX; else if (min === dx2) player.x = w.x + w.w + marginX;
+                    else if (min === dy1) player.y = w.y - marginY; else player.y = w.y + w.h + marginY;
+                }
+            });
+
+            if (player.hasStarRing) {
+                player.starRingAngle += 0.15; let cups = 5; let radius = 110;
+                for(let i=0; i<cups; i++) {
+                    let a = player.starRingAngle + (Math.PI * 2 / cups) * i;
+                    let cx = player.x + Math.cos(a) * radius; let cy = player.y + Math.sin(a) * radius;
+                    enemies.forEach(en => {
+                        if (en.isEntering) return;
+                        if (getDistance(cx, cy, en.x, en.y) < en.size + 25) {
+                            if (frameCount % 10 === 0) { 
+                                let dmg = en.isBoss ? (en.maxHp * 0.005) : (1000 * hpMultiplier * getEffectiveDamageMult());
+                                en.hp -= dmg; damageNumbers.push({x: en.x, y: en.y-20, text:`⚔️-${formatDamage(dmg)}`, timer:20, color:'#e67e22'});
+                            }
+                        }
+                    });
+                    bossBullets.forEach((bb, bIndex) => {
+                        if (getDistance(cx, cy, bb.x, bb.y) < bb.radius + 25) if (Math.random() < 0.5) bossBullets.splice(bIndex, 1);
+                    });
+                }
+            }
+
+            if (player.hasBoss1Skill) {
+                enemies.forEach(e => {
+                    if (e.isEntering) return;
+                    if (getDistance(player.x, player.y, e.x, e.y) < 200) {
+                        if (frameCount % 15 === 0) { 
+                            let auraDmg = 50 * getEffectiveDamageMult();
+                            e.hp -= auraDmg; damageNumbers.push({x: e.x, y: e.y-10, text:`🔥-${formatDamage(auraDmg)}`, timer:20, color:'#e74c3c'});
+                        }
+                    }
+                });
+            }
+
+            if (player.hasBoss2Skill) {
+                player.boss2Timer++;
+                if (player.boss2Timer >= 180) { 
+                    player.boss2Timer = 0;
+                    for (let i = 0; i < 12; i++) {
+                        let a = (Math.PI * 2 / 12) * i + (frameCount * 0.1); 
+                        bullets.push({x: player.x, y: player.y, vx: Math.cos(a)*5, vy: Math.sin(a)*5, angle: a, radius: 15, type: 'stolen2', dmg: 150});
+                    }
+                }
+            }
+
+            if (player.hasBoss3Skill) {
+                player.boss3Timer++; if (player.boss3Timer >= 1200) { player.boss3Timer = 0; xRays.push({timer: 60, isRedK: false}); }
+            }
+            if (player.hasBoss4Skill && player.hp < player.maxHp * 0.3 && player.redKCooldown <= 0) {
+                player.redKCooldown = 3600; player.invulTimer = 120; xRays.push({timer: 60, isRedK: true}); 
+            }
+            if (player.hasBoss5Skill) {
+                player.boss5Timer++;
+                if (player.boss5Timer >= 1800) {
+                    player.boss5Timer = 0; let target = null; let maxHpFound = -1;
+                    enemies.forEach(en => { if(en.hp > maxHpFound) { maxHpFound = en.hp; target = en; } });
+                    if (target) { let a = Math.atan2(target.y - player.y, target.x - player.x); zoltraaks.push({x: player.x, y: player.y, angle: a, timer: 60, isPlayer: true}); }
+                }
+            }
+
+            let target = null;
+            if (enemies.length > 0) {
+                let validEnemies = enemies.filter(e => !e.isEntering);
+                if (validEnemies.length > 0) {
+                    target = validEnemies[0]; let mD = getDistance(player.x, player.y, target.x, target.y);
+                    for(let i=1; i<validEnemies.length; i++) {
+                        let d = getDistance(player.x, player.y, validEnemies[i].x, validEnemies[i].y);
+                        if(d < mD) { mD = d; target = validEnemies[i]; }
+                    }
+                }
+            }
+
+            let globalCdMult = isTariffActive ? 2 : 1;
+
+            if (target) {
+                const angle = Math.atan2(target.y - player.y, target.x - player.x);
+
+                if (frameCount - skillData[SKILL_TYPES.AMERICANO].lastFiredFrame >= (skillData[SKILL_TYPES.AMERICANO].baseCooldown * globalCdMult) / (getUpg(SKILL_TYPES.AMERICANO, 'am_speed_up') > 0 ? 2 : 1)) {
+                    skillData[SKILL_TYPES.AMERICANO].lastFiredFrame = frameCount;
+                    let c = getUpg(SKILL_TYPES.AMERICANO, 'am_multi_3') > 0 ? 6 : 1; 
+                    for (let i=0; i<c; i++) {
+                        let a = angle + (i - (c-1)/2)*0.2;
+                        bullets.push({x:player.x, y:player.y, vx:Math.cos(a)*3, vy:Math.sin(a)*3, angle:a, radius:16, type:'americano', dmg:100, pc:0, mp:getUpg(SKILL_TYPES.AMERICANO, 'am_pierce_100')>0?999:(Math.random()<0.7?1:0)});
+                    } triggerShout(SKILL_TYPES.AMERICANO);
+                }
+
+                if (skillData[SKILL_TYPES.LATTE].isLearned && frameCount - skillData[SKILL_TYPES.LATTE].lastFiredFrame >= (skillData[SKILL_TYPES.LATTE].baseCooldown * globalCdMult) / (getUpg(SKILL_TYPES.LATTE, 'la_speed_up') > 0 ? 2 : 1)) {
+                    skillData[SKILL_TYPES.LATTE].lastFiredFrame = frameCount;
+                    let c = getUpg(SKILL_TYPES.LATTE, 'la_multi_3') > 0 ? 6 : 1;
+                    for (let i=0; i<c; i++) {
+                        let a = angle + (i - (c-1)/2)*0.3;
+                        bullets.push({x:player.x, y:player.y, vx:Math.cos(a)*2, vy:Math.sin(a)*2, angle:a, radius:22, type:'latte', dmg:200});
+                    } triggerShout(SKILL_TYPES.LATTE);
+                }
+
+                if (skillData[SKILL_TYPES.COLD_BREW].isLearned && frameCount - skillData[SKILL_TYPES.COLD_BREW].lastFiredFrame >= (skillData[SKILL_TYPES.COLD_BREW].baseCooldown * globalCdMult) / (getUpg(SKILL_TYPES.COLD_BREW, 'cb_speed_up') > 0 ? 2 : 1)) {
+                    skillData[SKILL_TYPES.COLD_BREW].lastFiredFrame = frameCount;
+                    let c = getUpg(SKILL_TYPES.COLD_BREW, 'cb_multi_2') > 0 ? 2 : 1;
+                    for(let i=0; i<c; i++) {
+                        let validForCb = enemies.filter(e => !e.isEntering);
+                        let te = validForCb.length > 0 ? validForCb[Math.floor(Math.random() * validForCb.length)] : null;
+                        if (te) bullets.push({x:te.x+(Math.random()*40-20), y:te.y+(Math.random()*40-20), vx:0, vy:0, angle:0, radius:35, type:'coldBrew', dmg:60, t:30, fall:true});
+                    } triggerShout(SKILL_TYPES.COLD_BREW);
+                }
+
+                let apCd = (skillData[SKILL_TYPES.AEROPRESS].baseCooldown * globalCdMult) * (getUpg(SKILL_TYPES.AEROPRESS, 'ap_cd_down') > 0 ? 0.7 : 1);
+                if (skillData[SKILL_TYPES.AEROPRESS].isLearned && frameCount - skillData[SKILL_TYPES.AEROPRESS].lastFiredFrame >= apCd) {
+                    skillData[SKILL_TYPES.AEROPRESS].lastFiredFrame = frameCount;
+                    let apRadius = getUpg(SKILL_TYPES.AEROPRESS, 'ap_size') > 0 ? 90 : 45;
+                    bullets.push({x:player.x, y:player.y, vx:Math.cos(angle)*8, vy:Math.sin(angle)*8, angle:angle, radius:apRadius, type:'aeropress', dmg:150, hitList: new Set()});
+                    triggerShout(SKILL_TYPES.AEROPRESS);
+                }
+            }
+
+            if (skillData[SKILL_TYPES.ULULTIMATE].isLearned) {
+                let ultBaseCd = player.ultimateUpgraded ? 600 : 1200;
+                let ultCd = ultBaseCd * globalCdMult; 
+                isUltimateReady = (frameCount - skillData[SKILL_TYPES.ULULTIMATE].lastFiredFrame) >= ultCd;
+
+                if (isUltimateReady && keys[" "]) {
+                    skillData[SKILL_TYPES.ULULTIMATE].lastFiredFrame = frameCount;
+                    isUltimateReady = false; 
+                    ultimates.push({ timer: 60, maxTimer: 60 });
+                    for(let p=0; p<60; p++) {
+                        let pa = Math.random() * Math.PI * 2; let pSpeed = Math.random() * 25 + 10;
+                        ultParticles.push({ x: canvas.width/2, y: canvas.height/2, vx: Math.cos(pa) * pSpeed, vy: Math.sin(pa) * pSpeed, life: 60, size: Math.random()*15 + 5, color: Math.random() > 0.5 ? '#f1c40f' : '#fff' });
+                    }
+                    
+                    let bDmg = player.ultimateUpgraded ? 250000 : 50000; 
+                    let critRate = player.ultimateUpgraded ? 1.0 : player.baseCritRate;
+                    let critMult = player.ultimateUpgraded ? 3.0 : 1.5;
+
+                    enemies.forEach(e => {
+                        if (e.isEntering) return;
+                        let finalDmg = bDmg;
+                        let isSlowed = e.speed < e.bs;
+                        if (isSlowed) finalDmg *= 3; 
+                        let isCrit = Math.random() < critRate;
+                        if (isCrit) finalDmg = Math.floor(finalDmg * critMult);
+                        finalDmg *= getEffectiveDamageMult();
+                        e.hp -= finalDmg;
+                        damageNumbers.push({x: e.x, y: e.y, text:`${isCrit?'💥':''}-${formatDamage(finalDmg)}`, timer: 40, color: '#f1c40f'});
+                        if (player.ultimateUpgraded) e.bTimer = 600; 
+                    });
+                    triggerShout(SKILL_TYPES.ULULTIMATE);
+                }
+            }
+
+            for (let i = mimicChests.length - 1; i >= 0; i--) {
+                let c = mimicChests[i]; c.timer--;
+                if (getDistance(player.x, player.y, c.x, c.y) < player.collisionRadius + c.radius) {
+                    takeDamage(50); explosions.push({ x: c.x, y: c.y, maxRadius: 150, currentRadius: 10, alpha: 1.0 }); mimicChests.splice(i, 1); continue;
+                }
+                if (c.timer <= 0) {
+                    let a = Math.atan2(player.y - c.y, player.x - c.x);
+                    bossBullets.push({x: c.x, y: c.y, vx: Math.cos(a)*6, vy: Math.sin(a)*6, radius: 10, dmg: 40, type: 'mimicArrow', isHoming: true}); mimicChests.splice(i, 1);
+                }
+            }
+
+            for(let i=zoltraaks.length-1; i>=0; i--) {
+                let z = zoltraaks[i]; z.timer--;
+                if(z.timer <= 60 && !z.isPlayer) {
+                    let pAngle = Math.atan2(player.y - z.y, player.x - z.x); let dist = getDistance(z.x, z.y, player.x, player.y);
+                    let ad = Math.abs(pAngle - z.angle); if (ad > Math.PI) ad = 2 * Math.PI - ad;
+                    let widthTolerance = 60 / dist; 
+                    if (ad < widthTolerance) { if (z.isPurple && dist < 2000) takeDamage(99999); else if (dist < 1500) { player.hp -= 20; player.invulTimer = 0; } }
+                }
+                if (z.isPlayer) {
+                    enemies.forEach(en => {
+                        if (en.isEntering) return;
+                        let pAngle = Math.atan2(en.y - z.y, en.x - z.x); let dist = getDistance(z.x, z.y, en.x, en.y);
+                        let ad = Math.abs(pAngle - z.angle); if (ad > Math.PI) ad = 2 * Math.PI - ad;
+                        let widthTolerance = 60 / dist; 
+                        if (ad < widthTolerance && dist < 1500) { if (frameCount % 5 === 0) { let zDmg = 5000 * getEffectiveDamageMult(); en.hp -= zDmg; damageNumbers.push({x:en.x, y:en.y, text:`💥-${formatDamage(zDmg)}`, timer:20, color:'#f1c40f'}); } }
+                    });
+                }
+                if (z.timer <= 0) zoltraaks.splice(i, 1);
+            }
+
+            for (let i = cyberTrucks.length - 1; i >= 0; i--) {
+                let ct = cyberTrucks[i];
+                if (ct.warningTimer > 0) ct.warningTimer--;
+                else {
+                    ct.x += ct.vx;
+                    if (!ct.hit && getDistance(ct.x, ct.y, player.x, player.y) < player.collisionRadius + ct.height/2) { takeDamage(80); player.x -= 200; ct.hit = true; }
+                    if (ct.x < -ct.width) cyberTrucks.splice(i, 1);
+                }
+            }
+
+            for (let i = starlinks.length - 1; i >= 0; i--) {
+                let sl = starlinks[i]; sl.timer--;
+                if (sl.timer <= 0) { if (getDistance(sl.x, sl.y, player.x, player.y) < sl.radius) takeDamage(60); starlinks.splice(i, 1); }
+            }
+
+            for (let i = kPillars.length - 1; i >= 0; i--) {
+                let kp = kPillars[i]; kp.timer--;
+                if (kp.timer === 180) { if (getDistance(kp.x, kp.y, player.x, player.y) < kp.radius + player.collisionRadius) { takeDamage(100); player.speed = 0.5; } }
+                if (kp.timer <= 180 && kp.timer > 0) { if (getDistance(kp.x, kp.y, player.x, player.y) < kp.radius + player.collisionRadius) player.speed = 0.5; }
+                if (kp.timer <= 0) kPillars.splice(i, 1);
+            }
+
+            for (let i = trumpWalls.length - 1; i >= 0; i--) {
+                trumpWalls[i].timer--;
+                if (trumpWalls[i].timer <= 0) trumpWalls.splice(i, 1);
+            }
+
+            for (let i = twitterBirds.length - 1; i >= 0; i--) {
+                let tb = twitterBirds[i];
+                let angle = Math.atan2(player.y - tb.y, player.x - tb.x);
+                tb.x += Math.cos(angle) * 1.5; tb.y += Math.sin(angle) * 1.5;
+                if (getDistance(tb.x, tb.y, player.x, player.y) < player.collisionRadius + tb.radius) {
+                    isUIHidden = 300; twitterBirds.splice(i, 1);
+                }
+            }
+
+            for(let i=blackHoles.length-1; i>=0; i--) {
+                let bh = blackHoles[i]; bh.timer--; let pullSpeed = bh.isPlayer ? 8 : 4; let pullRadius = bh.isPlayer ? 400 : 300;
+                if (bh.isPlayer) {
+                    bh.x += Math.cos(bh.angle) * 3; bh.y += Math.sin(bh.angle) * 3;
+                    enemies.forEach(en => {
+                        if (en.isEntering) return;
+                        let d = getDistance(bh.x, bh.y, en.x, en.y);
+                        if (d < pullRadius) {
+                            let a = Math.atan2(bh.y - en.y, bh.x - en.x); en.x += Math.cos(a) * pullSpeed; en.y += Math.sin(a) * pullSpeed;
+                            if (d < 50 && frameCount % 10 === 0) { if (!en.isBoss) en.hp = 0; else en.hp -= 10000 * getEffectiveDamageMult(); }
+                        }
+                    });
+                } else {
+                    let d = getDistance(bh.x, bh.y, player.x, player.y);
+                    if (d < pullRadius) { let a = Math.atan2(bh.y - player.y, bh.x - player.x); player.x += Math.cos(a) * pullSpeed; player.y += Math.sin(a) * pullSpeed; if (d < 50 && frameCount % 10 === 0) takeDamage(20); }
+                    enemies.forEach(en => {
+                        if (en.isEntering) return;
+                        let ed = getDistance(bh.x, bh.y, en.x, en.y);
+                        if (ed < pullRadius) { let a = Math.atan2(bh.y - en.y, bh.x - en.x); en.x += Math.cos(a) * pullSpeed; en.y += Math.sin(a) * pullSpeed; }
+                    });
+                }
+                if (bh.timer <= 0) blackHoles.splice(i, 1);
+            }
+            
+            let shouldBeSpeed = 1.5;
+            if (player.hasBoss1Skill) shouldBeSpeed *= 6;
+            if (isTariffActive) shouldBeSpeed *= 0.5; 
+            let isInSlow = kPillars.some(kp => kp.timer <= 180 && getDistance(kp.x, kp.y, player.x, player.y) < kp.radius + player.collisionRadius);
+            if (isInSlow) player.speed = Math.max(0.5, shouldBeSpeed * 0.33);
+            else player.speed = shouldBeSpeed;
+
+            for (let i = xRays.length - 1; i >= 0; i--) {
+                let xr = xRays[i]; xr.timer--;
+                if (xr.timer === 30) { 
+                    enemies.forEach(e => {
+                        if (e.isEntering) return;
+                        let dx = e.x - player.x; let dy = e.y - player.y;
+                        if (xr.isRedK) {
+                            if (Math.abs(dx) < 80 || Math.abs(dy) < 80) { if (!e.isBoss) e.hp = 0; else e.hp -= 99999 * getEffectiveDamageMult(); }
+                        } else {
+                            if (Math.abs(dx - dy) < 100 || Math.abs(dx + dy) < 100) { if (!e.isBoss) e.hp = 0; else e.hp -= 99999 * getEffectiveDamageMult(); }
+                        }
+                    });
+                } if (xr.timer <= 0) xRays.splice(i, 1);
+            }
+
+            for (let i = bossBullets.length - 1; i >= 0; i--) {
+                let bb = bossBullets[i];
+                if (bb.isHoming) {
+                    let a = Math.atan2(player.y - bb.y, player.x - bb.x); let curA = Math.atan2(bb.vy, bb.vx); let diff = a - curA;
+                    while (diff > Math.PI) diff -= Math.PI * 2; while (diff < -Math.PI) diff += Math.PI * 2;
+                    let newA = curA + Math.sign(diff) * Math.min(Math.abs(diff), 0.05); let spd = Math.sqrt(bb.vx*bb.vx + bb.vy*bb.vy);
+                    bb.vx = Math.cos(newA) * spd; bb.vy = Math.sin(newA) * spd;
+                }
+                let bbSpeedX = bb.vx; let bbSpeedY = bb.vy;
+                if (player.hasLimitless) { bbSpeedX *= 0.5; bbSpeedY *= 0.5; }
+                bb.x += bbSpeedX; bb.y += bbSpeedY;
+
+                if (getDistance(bb.x, bb.y, player.x, player.y) < player.collisionRadius + bb.radius) { takeDamage(bb.dmg); bossBullets.splice(i, 1); continue; }
+                if (bb.x < 0 || bb.x > canvas.width || bb.y < 0 || bb.y > canvas.height) bossBullets.splice(i, 1);
+            }
+
+            let boss6 = enemies.find(e => e.isBoss && e.bossType === 6);
+
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                let b = bullets[i];
+                
+                let hitWall = false;
+                for(let w of trumpWalls) {
+                    if (b.x > w.x && b.x < w.x + w.w && b.y > w.y && b.y < w.y + w.h) { hitWall = true; break; }
+                }
+                if (hitWall) { bullets.splice(i, 1); continue; }
+
+                if (b.type === 'coldBrew' && b.fall) {
+                    b.t--; if (b.t <= 0) {
+                        let rad = getUpg(SKILL_TYPES.COLD_BREW, 'cb_range_up') > 0 ? 320 : 160;
+                        if (getUpg(SKILL_TYPES.COLD_BREW, 'cb_blackhole') > 0) {
+                            let pull = getUpg(SKILL_TYPES.COLD_BREW, 'cb_pull_range') > 0 ? 300 : 150;
+                            enemies.forEach(e => { 
+                                if (e.isEntering) return;
+                                if(getDistance(b.x,b.y,e.x,e.y)<pull) { let a=Math.atan2(b.y-e.y, b.x-e.x); e.x+=Math.cos(a)*40; e.y+=Math.sin(a)*40; }
+                            });
+                        }
+                        iceZones.push({x:b.x, y:b.y, r:rad, t:getUpg(SKILL_TYPES.COLD_BREW, 'cb_duration_dmg') > 0 ? 360 : 180});
+                        bullets.splice(i, 1);
+                    } continue;
+                }
+
+                if (player.hasHoming && (b.type === 'americano' || b.type === 'latte' || b.type === 'stolen2')) {
+                    let nearest = null; let minDist = 300;
+                    enemies.forEach(e => {
+                        if (e.isEntering) return;
+                        let d = getDistance(b.x, b.y, e.x, e.y);
+                        if(d < minDist) { minDist = d; nearest = e; }
+                    });
+                    if (nearest) {
+                        let targetAngle = Math.atan2(nearest.y - b.y, nearest.x - b.x); let currentAngle = Math.atan2(b.vy, b.vx);
+                        let angleDiff = targetAngle - currentAngle;
+                        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2; while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+                        let turnSpeed = 0.05; 
+                        let newAngle = currentAngle + Math.sign(angleDiff) * Math.min(Math.abs(angleDiff), turnSpeed);
+                        let speed = Math.sqrt(b.vx*b.vx + b.vy*b.vy); b.vx = Math.cos(newAngle) * speed; b.vy = Math.sin(newAngle) * speed;
+                    }
+                }
+
+                if (boss6 && b.type !== 'aeropress' && b.type !== 'stolen2') {
+                    if (getDistance(b.x, b.y, boss6.x, boss6.y) < 150 && !boss6.isEntering) {
+                        b.vx *= 0.8; b.vy *= 0.8;
+                        if (Math.abs(b.vx) < 0.5 && Math.abs(b.vy) < 0.5) { bullets.splice(i, 1); continue; }
+                    }
+                }
+
+                b.x+=b.vx; b.y+=b.vy;
+                if (b.x<0||b.x>canvas.width||b.y<0||b.y>canvas.height) { bullets.splice(i,1); continue; }
+
+                for (let j=enemies.length-1; j>=0; j--) {
+                    let e = enemies[j];
+                    if (e.isEntering) continue;
+                    if (getDistance(b.x,b.y,e.x,e.y) < e.size+b.radius) {
+                        let fDmg = b.dmg; let cr = player.baseCritRate;
+                        
+                        if (b.type === 'aeropress') {
+                            if (!b.hitList.has(e)) {
+                                b.hitList.add(e); let apDmg = b.dmg;
+                                if (getUpg(SKILL_TYPES.AEROPRESS, 'ap_dmg') > 0) apDmg *= 3; apDmg *= getEffectiveDamageMult(); e.hp -= apDmg;
+                                damageNumbers.push({x:e.x, y:e.y-40, text:`💥-${formatDamage(apDmg)}`, timer:30, color:'#9b59b6'});
+                                let kbDist = getUpg(SKILL_TYPES.AEROPRESS, 'ap_knockback') > 0 ? 150 : 60; if (e.isBoss) kbDist *= 0.2;
+                                e.x += Math.cos(b.angle) * kbDist; e.y += Math.sin(b.angle) * kbDist;
+                                if (getUpg(SKILL_TYPES.AEROPRESS, 'ap_stun') > 0 && !e.isBoss) e.speed = e.bs * 0.1;
+                            } continue;
+                        }
+
+                        if (b.type === 'stolen2') {
+                             fDmg *= getEffectiveDamageMult(); e.hp -= fDmg; damageNumbers.push({x:e.x, y:e.y-30, text:`-${formatDamage(fDmg)}`, timer:30, color:'#2ecc71'}); bullets.splice(i,1); break;
+                        }
+
+                        if(b.type==='americano' && getUpg(SKILL_TYPES.AMERICANO, 'am_crit_100')>0) cr=1.0;
+                        let crit = Math.random() < cr; let cm = b.type==='americano'&&getUpg(SKILL_TYPES.AMERICANO, 'am_crit_dmg_stack')>0 ? 2.0 : 1.5;
+                        if (crit) fDmg = Math.floor(fDmg*cm);
+                        if (b.type==='americano' && b.pc>0 && getUpg(SKILL_TYPES.AMERICANO, 'am_dmg_after_pierce')>0) fDmg*=2;
+                        if (b.type==='americano' && e.bTimer > 0 && getUpg(SKILL_TYPES.AMERICANO, 'am_dmg_burn') > 0) fDmg *= 2;
+
+                        fDmg *= getEffectiveDamageMult(); 
+
+                        e.hp -= fDmg; damageNumbers.push({x:e.x, y:e.y-30, text:`${crit?'💥':''}-${formatDamage(fDmg)}`, timer:30, color:'#e74c3c'});
+                        if (b.type==='americano' && getUpg(SKILL_TYPES.AMERICANO, 'am_ice_slow')>0) { if (!e.isBoss || (e.isBoss && e.hp < e.maxHp * 0.3)) e.speed = e.bs * 0.7; }
+
+                        if (b.type==='latte') {
+                            let ar = getUpg(SKILL_TYPES.LATTE, 'la_aoe_range')>0 ? 360 : 180; let ad = getUpg(SKILL_TYPES.LATTE, 'la_aoe_dmg')>0 ? 200 : 100; ad *= getEffectiveDamageMult(); 
+                            explosions.push({ x: b.x, y: b.y, maxRadius: ar, currentRadius: 10, alpha: 1.0 });
+                            enemies.forEach(se => {
+                                if (se.isEntering) return;
+                                if(getDistance(b.x,b.y,se.x,se.y)<ar) {
+                                    se.hp-=ad; damageNumbers.push({x:se.x,y:se.y-15,text:`💥-${formatDamage(ad)}`, timer:20,color:'#f39c12'});
+                                    if (getUpg(SKILL_TYPES.LATTE, 'la_burn') > 0) se.bTimer = Math.max(se.bTimer || 0, 180);
+                                    if(getUpg(SKILL_TYPES.LATTE, 'la_knockback')>0) {
+                                        let ka = Math.atan2(se.y-b.y, se.x-b.x); let kd = getUpg(SKILL_TYPES.LATTE, 'la_knockback_dist')>0 ? 80 : 40;
+                                        se.x+=Math.cos(ka)*kd; se.y+=Math.sin(ka)*kd;
+                                    }
+                                }
+                            }); bullets.splice(i,1); break;
+                        }
+                        if (b.type==='americano') { if(b.pc<b.mp) b.pc++; else { bullets.splice(i,1); break; } }
+                    }
+                }
+            }
+
+            for (let i = iceZones.length-1; i>=0; i--) {
+                let z = iceZones[i];
+                enemies.forEach(e => {
+                    if (e.isEntering) return;
+                    if (getDistance(z.x, z.y, e.x, e.y) < z.r) {
+                        if (!e.isBoss || (e.isBoss && e.hp < e.maxHp * 0.3)) e.speed = e.bs * 0.25;
+                        if (getUpg(SKILL_TYPES.COLD_BREW, 'cb_duration_dmg')>0 && frameCount%30===0) {
+                            let fd = getUpg(SKILL_TYPES.COLD_BREW, 'cb_dmg_up')>0 ? 720 : 360; 
+                            if (e.bTimer > 0 && getUpg(SKILL_TYPES.COLD_BREW, 'cb_dmg_burn') > 0) fd *= 3; fd *= getEffectiveDamageMult(); 
+                            e.hp -= fd; damageNumbers.push({x:e.x, y:e.y-10, text:`❄️-${formatDamage(fd)}`, timer:20, color:'#3498db'});
+                        }
+                    }
+                }); z.t--; if(z.t<=0) iceZones.splice(i,1);
+            }
+
+            for (let i = explosions.length - 1; i >= 0; i--) {
+                let exp = explosions[i]; exp.currentRadius += (exp.maxRadius - exp.currentRadius) * 0.2; exp.alpha -= 0.05;
+                if (exp.isRed && exp.alpha > 0.8) { if (getDistance(exp.x, exp.y, player.x, player.y) < exp.currentRadius) { takeDamage(exp.dmg); exp.isRed = false; } }
+                if (exp.alpha <= 0) explosions.splice(i, 1);
+            }
+
+            for (let i = ultimates.length - 1; i >= 0; i--) { ultimates[i].timer--; if (ultimates[i].timer <= 0) ultimates.splice(i, 1); }
+
+            if (level >= 40 && !boss1Spawned) { boss1Spawned = true; enemies.push({ x: canvas.width/2, y: -250, size: 100, bs: 0.4, speed: 0.4, hp: 100*hpMultiplier*150, maxHp: 100*hpMultiplier*150, bTimer: 0, type: 'img', img: boss1Img, isBoss: true, bossType: 1, attackTimer: 0, invulTimer: 0, hasTriggeredInvul: false, isEntering: true }); }
+            if (level >= 50 && !boss2Spawned) { boss2Spawned = true; enemies.push({ x: canvas.width/2, y: -250, size: 100, bs: 0.5, speed: 0.5, hp: 100*hpMultiplier*250, maxHp: 100*hpMultiplier*250, bTimer: 0, type: 'img', img: nvidaImg, isBoss: true, bossType: 2, attackTimer: 0, invulTimer: 0, hasTriggeredInvul: false, isEntering: true }); }
+            if (level >= 60 && !boss3Spawned) { boss3Spawned = true; enemies.push({ x: canvas.width/2, y: -250, size: 100, bs: 0.6, speed: 0.6, hp: 100*hpMultiplier*500, maxHp: 100*hpMultiplier*500, bTimer: 0, type: 'img', img: mkImg, isBoss: true, bossType: 3, attackTimer: 0, invulTimer: 0, hasTriggeredInvul: false, isEntering: true }); }
+            if (level >= 70 && !boss4Spawned) { boss4Spawned = true; enemies.push({ x: canvas.width/2, y: -250, size: 100, bs: 0.45, speed: 0.45, hp: 100*hpMultiplier*600, maxHp: 100*hpMultiplier*600, bTimer: 0, type: 'img', img: boss4Img, isBoss: true, bossType: 4, attackTimer: 0, invulTimer: 0, hasTriggeredInvul: false, isEntering: true }); }
+            if (level >= 80 && !boss5Spawned) { boss5Spawned = true; enemies.push({ x: canvas.width/2, y: -250, size: 40, bs: 0.1, speed: 0.1, hp: 100*hpMultiplier*1000, maxHp: 100*hpMultiplier*1000, bTimer: 0, type: 'img', img: flImg, isBoss: true, bossType: 5, attackTimer: 0, invulTimer: 0, hasTriggeredInvul: false, isEntering: true, hideHpBar: true, castZoltraak: 0 }); }
+            if (level >= 90 && !boss6Spawned) { boss6Spawned = true; enemies.push({ x: canvas.width/2, y: -250, size: 80, bs: 0.8, speed: 0.8, hp: 100*hpMultiplier*2000, maxHp: 100*hpMultiplier*2000, bTimer: 0, type: 'img', img: boss6Img, isBoss: true, bossType: 6, attackTimer: 0, invulTimer: 0, hasTriggeredInvul: false, isEntering: true, hasTriggeredVoid: false }); }
+            
+            if (level >= 100 && !boss7Spawned) {
+                boss7Spawned = true;
+                enemies.length = 0; 
+                bossBullets.length = 0;
+                enemies.push({ x: canvas.width/2, y: -250, size: 120, bs: 0.3, speed: 0.3, hp: 100*hpMultiplier*10000, maxHp: 100*hpMultiplier*10000, bTimer: 0, type: 'img', img: trumpImg, isBoss: true, bossType: 7, attackTimer: 0, invulTimer: 0, hasTriggeredInvul: false, isEntering: true, hasTriggeredTariff: false });
+            }
+
+            let effectiveLevelForSpawn = Math.min(level, 60); let spawnTier = Math.floor(effectiveLevelForSpawn / 10);
+            let spawnMultiplier = Math.pow(1.5, spawnTier); let currentSpawnRate = Math.max(2, Math.floor(60 / spawnMultiplier));
+
+            if (Math.floor(level / 5) > goblinSpawnCount && level < 100) {
+                goblinSpawnCount++; let spawnLimit = level >= 85 ? 3 : 1;
+                for (let g = 0; g < spawnLimit; g++) {
+                    let ex = Math.random()<0.5 ? -60 : canvas.width+60; let ey = Math.random()*canvas.height;
+                    enemies.push({ x: ex, y: ey, size: 50, bs: 0.8, speed: 0.8, hp: 100*hpMultiplier*10, maxHp: 100*hpMultiplier*10, bTimer: 0, type: 'img', img: linImg, isGoblin: true, isEntering: true });
+                }
+            }
+
+            if (frameCount % currentSpawnRate === 0 && level < 100) { 
+                let ex = Math.random()<0.5 ? -60 : canvas.width+60; let ey = Math.random()*canvas.height; let spd = 0.5 + Math.random()*0.3; 
+
+                let enemyPool = [ { type: 'emoji', hp: 100 * hpMultiplier } ];
+                if (level >= 10) enemyPool.push({ type: 'img', img: work1Img, hp: 120 * hpMultiplier });
+                if (level >= 20) enemyPool.push({ type: 'img', img: work2Img, hp: 150 * hpMultiplier });
+                if (level >= 30) enemyPool.push({ type: 'img', img: momoImg, hp: 180 * hpMultiplier });
+
+                let miniHp = 150 * hpMultiplier;
+                if (player.hasBoss1Skill) enemyPool.push({ type: 'img', img: boss1Img, hp: miniHp, isMini: true, bType: 1 });
+                if (player.hasBoss2Skill) enemyPool.push({ type: 'img', img: nvidaImg, hp: miniHp, isMini: true, bType: 2 });
+                if (player.hasBoss3Skill) enemyPool.push({ type: 'img', img: mkImg, hp: miniHp, isMini: true, bType: 3 });
+                if (player.hasBoss4Skill) enemyPool.push({ type: 'img', img: boss4Img, hp: miniHp, isMini: true, bType: 4 });
+                if (player.hasBoss5Skill) enemyPool.push({ type: 'img', img: flImg, hp: miniHp, isMini: true, bType: 5, hideHpBar: true });
+
+                let selectedEnemy = enemyPool[Math.floor(Math.random() * enemyPool.length)];
+                let newEnemy = { x: ex, y: ey, size: 40, bs: spd, speed: spd, hp: selectedEnemy.hp, maxHp: selectedEnemy.hp, bTimer: 0, type: selectedEnemy.type, isEntering: true };
+
+                if (selectedEnemy.type === 'emoji') newEnemy.emoji = animalZombies[Math.floor(Math.random()*animalZombies.length)];
+                else { newEnemy.img = selectedEnemy.img; if (selectedEnemy.hideHpBar) newEnemy.hideHpBar = true; }
+                if (selectedEnemy.isMini) { newEnemy.isMiniBoss = true; newEnemy.bossType = selectedEnemy.bType; newEnemy.attackTimer = 0; if (selectedEnemy.bType === 5) newEnemy.castZoltraak = 0; }
+                enemies.push(newEnemy);
+            }
+
+            for (let i=enemies.length-1; i>=0; i--) {
+                let e = enemies[i];
+
+                if ((e.isBoss || e.isMiniBoss) && !e.isEntering) {
+                    let isB = e.isBoss; 
+                    
+                    if (e.bossType === 7) {
+                        e.attackTimer++;
+                        // 1. 行政命令：全員到齊
+                        if (e.attackTimer % 1200 === 0 && isB) {
+                            xRays.push({timer: 10, isRedK: false});
+                            let bType = Math.floor(Math.random() * 5) + 1;
+                            let bImg = [boss1Img, nvidaImg, mkImg, boss4Img, flImg][bType - 1];
+                            let bSize = [100, 100, 100, 100, 40][bType - 1];
+                            enemies.push({
+                                x: e.x + (Math.random()*400-200), y: e.y + (Math.random()*200), size: bSize, bs: 0.5, speed: 0.5,
+                                hp: 100*hpMultiplier*300, maxHp: 100*hpMultiplier*300, bTimer: 0, type: 'img', img: bImg, isBoss: true, bossType: bType,
+                                attackTimer: 0, invulTimer: 0, hasTriggeredInvul: false, isEntering: false
+                            });
+                        }
+                        // 2. 推特治國：假新聞轟炸
+                        if (e.attackTimer % 450 === 0 && isB) {
+                            for(let t = 0; t < 3; t++) twitterBirds.push({ x: Math.random() < 0.5 ? -50 : canvas.width + 50, y: Math.random() * canvas.height, radius: 25 });
+                        }
+                        // 3. 築起高牆：禁區封鎖
+                        if (e.attackTimer % 600 === 0 && isB) {
+                            trumpWalls.push({ x: Math.random() * (canvas.width - 200), y: Math.random() * (canvas.height - 200), w: Math.random() > 0.5 ? 600 : 50, h: Math.random() > 0.5 ? 50 : 600, timer: 600 });
+                        }
+                        // 4. 關稅壁壘：絕對緩速
+                        if (e.hp < e.maxHp * 0.3 && !e.hasTriggeredTariff && isB) {
+                            e.hasTriggeredTariff = true; isTariffActive = true;
+                        }
+                    } else if (e.bossType === 6) {
+                        e.attackTimer++;
+                        if (e.attackTimer % 400 === 0 && isB) blackHoles.push({x: e.x + (Math.random()*600-300), y: e.y + (Math.random()*600-300), timer: 180, isPlayer: false});
+                        if (e.attackTimer % 600 === 300 && isB) {
+                            explosions.push({ x: e.x, y: e.y, maxRadius: 800, currentRadius: 10, alpha: 1.0, isRed: true, dmg: 80 });
+                            if (getDistance(e.x, e.y, player.x, player.y) < 800) { let a = Math.atan2(player.y - e.y, player.x - e.x); player.x += Math.cos(a) * 300; player.y += Math.sin(a) * 300; }
+                        }
+                        if (!e.hasTriggeredVoid && e.hp < e.maxHp * 0.8 && Math.random() < 0.02 && isB) { e.hasTriggeredVoid = true; controlsInverted = 300; }
+                    } else if (e.bossType === 5) {
+                        if (e.castZoltraak > 0) { e.castZoltraak--; e.speed = 0; if (e.castZoltraak === 0) e.speed = e.bs; } else {
+                            e.attackTimer++;
+                            if (e.hp < e.maxHp * 0.5 && !e.hasTriggeredZoltraak && isB) { e.hasTriggeredZoltraak = true; e.castZoltraak = 120; let a = Math.atan2(player.y - e.y, player.x - e.x); zoltraaks.push({x: e.x, y: e.y, angle: a, timer: 180, isPlayer: false}); }
+                            if (e.attackTimer % 300 === 0 && isB) { for(let c=0; c<3; c++) mimicChests.push({x: Math.random()*(canvas.width-100)+50, y: Math.random()*(canvas.height-100)+50, timer: 300, radius: 25}); }
+                        }
+                    } else {
+                        e.attackTimer++;
+                        if (e.bossType === 1) { if (getDistance(e.x, e.y, player.x, player.y) < (isB ? 300 : 120)) { if (frameCount % 30 === 0) takeDamage(isB ? 20 : 5); } } 
+                        else if (e.bossType === 2) {
+                            if (e.attackTimer >= 180) {
+                                e.attackTimer = 0; let bulletCount = isB ? 12 : 6;
+                                for (let j = 0; j < bulletCount; j++) { let a = (Math.PI * 2 / bulletCount) * j; bossBullets.push({x: e.x, y: e.y, vx: Math.cos(a)*4, vy: Math.sin(a)*4, radius: isB ? 15 : 8, dmg: isB ? 40 : 15, type: 'boss2'}); }
+                            }
+                        } else if (e.bossType === 3) {
+                            if (isB && e.attackTimer === 240) cyberTrucks.push({x: canvas.width + 200, y: player.y, width: 300, height: 100, vx: -30, warningTimer: 60, hit: false});
+                            else if (e.attackTimer >= 480) { e.attackTimer = 0; for(let k=0; k < (isB ? 6 : 2); k++) starlinks.push({x: player.x + (Math.random()*600-300), y: player.y + (Math.random()*600-300), radius: isB ? 80 : 40, timer: 90}); }
+                        } else if (e.bossType === 4) {
+                            if (e.attackTimer % 180 === 0) kPillars.push({x: player.x, y: player.y, radius: isB ? 60 : 30, timer: 240});
+                            if (getDistance(e.x, e.y, player.x, player.y) < (isB ? 400 : 150)) { let distMoved = Math.hypot(player.x - player.lastX, player.y - player.lastY); if (distMoved < 1 && frameCount % 10 === 0) takeDamage(isB ? 15 : 5); }
+                        }
+                    }
+                }
+
+                if (e.isBoss && !e.isEntering && e.bossType !== 7) {
+                    if (e.invulTimer > 0) {
+                        e.invulTimer--;
+                        if (e.bossType === 6 && e.invulTimer === 300) { let a = Math.atan2(player.y - e.y, player.x - e.x); zoltraaks.push({x: e.x, y: e.y, angle: a, timer: 180, isPlayer: false, isPurple: true}); }
+                        if (e.hp < e.maxHp * 0.5) e.hp = e.maxHp * 0.5; 
+                    } else if (!e.hasTriggeredInvul && e.hp <= e.maxHp * 0.5) {
+                        e.hp = e.maxHp * 0.5; e.hasTriggeredInvul = true;
+                        if (e.bossType === 6 || e.bossType === 4 || e.bossType === 3 || e.bossType === 1 || e.bossType === 2) e.invulTimer = 600; 
+                    }
+                }
+
+                if (e.bTimer>0) {
+                    e.bTimer--; if(e.bTimer%30===0) { let bd = getUpg(SKILL_TYPES.AEROPRESS, 'ap_dmg')>0 ? 288 : 144; bd *= getEffectiveDamageMult(); e.hp-=bd; damageNumbers.push({x:e.x, y:e.y-20, text:`🔥-${formatDamage(bd)}`, timer:25, color:'#e74c3c'}); }
+                }
+
+                if (e.isEntering) {
+                    let angle = Math.atan2(player.y - e.y, player.x - e.x); e.speed = e.bs * 3; e.x += Math.cos(angle) * e.speed; e.y += Math.sin(angle) * e.speed; e.speed = e.bs;
+                    let margin = getEnemyMargin(e);
+                    if (e.x >= margin.x && e.x <= canvas.width - margin.x && e.y >= margin.y && e.y <= canvas.height - 60 - margin.y) e.isEntering = false;
+                } else if (!(e.bossType === 5 && e.castZoltraak > 0)) {
+                    const ea = Math.atan2(player.y-e.y, player.x-e.x); let currentEnemySpeed = e.speed;
+                    if (player.hasBoss5Skill && !e.isBoss) currentEnemySpeed *= 0.8; 
+                    if (player.hasLimitless) currentEnemySpeed *= 0.5;
+                    e.x+=Math.cos(ea)*currentEnemySpeed; e.y+=Math.sin(ea)*currentEnemySpeed; e.speed = e.bs;
+                }
+
+                if (e.hp<=0 && !e.isEntering) {
+                    if (player.hasCaffeineFever) { player.caffeineStacks = Math.min(player.caffeineUpgraded ? 100 : 40, player.caffeineStacks + 1); player.caffeineDecayTimer = 120; }
+                    let expRate = level < 30 ? 8 : 1;
+                    
+                    if (e.isBoss) {
+                        if (e.bossType === 7) {
+                            hasWon = true; 
+                        } else {
+                            score += 50; currentExp += 50 * expRate; if (level < 100) triggerInfoScreen('boss' + e.bossType);
+                        }
+                    } else if (e.isGoblin) {
+                        score += 10; currentExp += 10 * expRate; if (level < 100) triggerInfoScreen('goblin');
+                    } else {
+                        score += 1; currentExp += 1 * expRate; killCountForGoblin++;
+                        if (player.hasBoss4Skill) { player.killsSinceHeal++; if (player.killsSinceHeal >= 100) { player.hp = Math.min(player.maxHp, player.hp + player.maxHp * 0.1); player.shield++; player.killsSinceHeal = 0; } }
+                    }
+                    
+                    let levelsGained = 0;
+                    while (currentExp >= expToNextLevel && level < 100) {
+                        currentExp -= expToNextLevel; level++; levelsGained++;
+                        let tier = level >= 35 ? Math.floor((level - 25) / 10) : 0; expToNextLevel = Math.floor(20 * Math.pow(1.5, tier));
+                    }
+                    
+                    if(levelsGained > 0 && level < 100) { 
+                        for(let l = level - levelsGained + 1; l <= level; l++) if (l % 3 === 0) pendingUpgrades++;
+                    } 
+                    enemies.splice(i, 1); continue;
+                }
+                
+                if (!e.isEntering && getDistance(player.x,player.y,e.x,e.y) < player.collisionRadius+e.size-15) {
+                    takeDamage(e.isBoss ? 40 : 15); if (!e.isBoss) enemies.splice(i,1); 
+                }
+            }
+            
+            enemies.forEach(e => {
+                if (!e.isEntering) {
+                    let margin = getEnemyMargin(e);
+                    e.x = Math.max(margin.x, Math.min(canvas.width - margin.x, e.x)); e.y = Math.max(margin.y, Math.min(canvas.height - 60 - margin.y, e.y));
+                }
+            });
+
+            for(let i=damageNumbers.length-1; i>=0; i--) { damageNumbers[i].y-=0.5; damageNumbers[i].timer--; if(damageNumbers[i].timer<=0) damageNumbers.splice(i,1); } frameCount++;
+            if (damageNumbers.length > 30) damageNumbers.splice(0, damageNumbers.length - 30);
+            if (pendingUpgrades > 0 && postUltDelay <= 0 && !isUpgrading && !isPaused && !hasWon) { pendingUpgrades--; triggerUpgradeScreen(); }
+        }
+
+        function triggerShout(s) {
+            shotsFired++; if(shotsFired%5===0 || s === SKILL_TYPES.ULULTIMATE) {
+                player.shoutTimer=180;
+                if(s === SKILL_TYPES.AMERICANO) player.shoutText = "看我的美式咖啡！"; else if(s === SKILL_TYPES.LATTE) player.shoutText = "來杯溫潤的拿鐵！";
+                else if(s === SKILL_TYPES.COLD_BREW) player.shoutText = "巨冰急凍降溫！"; else if(s === SKILL_TYPES.AEROPRESS) player.shoutText = "感受愛樂壓的絕對高壓！";
+                else if(s === SKILL_TYPES.ULULTIMATE) player.shoutText = "見識全螢幕拉花的藝術吧！";
+            }
+        }
+
+        function drawGrid() {
+            const gridSize = 50; ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)'; ctx.lineWidth = 1; ctx.beginPath();
+            for (let x = 0; x <= canvas.width; x += gridSize) { ctx.moveTo(x + 0.5, 0); ctx.lineTo(x + 0.5, canvas.height); }
+            for (let y = 0; y <= canvas.height; y += gridSize) { ctx.moveTo(0, y + 0.5); ctx.lineTo(canvas.width, y + 0.5); }
+            ctx.stroke();
+        }
+
+        function draw() {
+            ctx.save();
+            let isShaking = ultimates.some(u => u.timer > 30) || xRays.some(xr => xr.timer > 20) || zoltraaks.some(z => z.timer < 60); 
+            if (isShaking) ctx.translate((Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30);
+
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+
+            if (isShaking) {
+                ctx.fillStyle = Math.random() > 0.5 ? 'rgba(255, 255, 255, 0.9)' : 'rgba(241, 196, 15, 0.6)';
+                if (xRays.some(xr => xr.isRedK)) ctx.fillStyle = Math.random() > 0.5 ? 'rgba(231, 76, 60, 0.5)' : 'rgba(255, 255, 255, 0.8)';
+                else if (xRays.length > 0 || zoltraaks.some(z => !z.isPlayer && z.timer < 60)) ctx.fillStyle = Math.random() > 0.5 ? 'rgba(142, 68, 173, 0.5)' : 'rgba(255, 255, 255, 0.8)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+
+            drawGrid();
+
+            if (controlsInverted > 0) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                if (frameCount % 3 === 0) { ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'; ctx.font = '20px monospace'; for (let i=0; i<15; i++) ctx.fillText(Math.random().toString(36).substring(2), Math.random()*canvas.width, Math.random()*canvas.height); }
+            }
+
+            enemies.forEach(e => {
+                if (e.isBoss && e.bossType === 4) {
+                    ctx.beginPath(); ctx.arc(e.x, e.y, 400, 0, Math.PI * 2);
+                    let grd = ctx.createRadialGradient(e.x, e.y, 200, e.x, e.y, 400); grd.addColorStop(0, 'rgba(46, 204, 113, 0)'); grd.addColorStop(1, 'rgba(46, 204, 113, 0.2)');
+                    ctx.fillStyle = grd; ctx.fill(); ctx.strokeStyle = '#2ecc71'; ctx.lineWidth = 2; ctx.stroke();
+                }
+                if (e.bossType === 5 && e.hp < e.maxHp) { ctx.beginPath(); ctx.arc(e.x, e.y, 150, 0, Math.PI * 2); ctx.fillStyle = `rgba(142, 68, 173, ${0.1 + (1 - e.hp/e.maxHp)*0.4})`; ctx.fill(); }
+                if (e.isBoss && e.bossType === 6) { ctx.beginPath(); ctx.arc(e.x, e.y, 150, 0, Math.PI * 2); ctx.fillStyle = 'rgba(173, 216, 230, 0.1)'; ctx.fill(); ctx.strokeStyle = 'rgba(173, 216, 230, 0.5)'; ctx.lineWidth = 2; ctx.stroke(); }
+            });
+
+            trumpWalls.forEach(w => {
+                ctx.fillStyle = 'rgba(127, 140, 141, 0.8)'; ctx.fillRect(w.x, w.y, w.w, w.h);
+                ctx.strokeStyle = '#2c3e50'; ctx.lineWidth = 4; ctx.strokeRect(w.x, w.y, w.w, w.h);
+            });
+
+            kPillars.forEach(kp => {
+                if (kp.timer > 180) { ctx.beginPath(); ctx.arc(kp.x, kp.y, kp.radius, 0, Math.PI*2); ctx.fillStyle = 'rgba(46, 204, 113, 0.3)'; ctx.fill(); } 
+                else { ctx.fillStyle = 'rgba(46, 204, 113, 0.8)'; ctx.fillRect(kp.x - kp.radius, kp.y - kp.radius, kp.radius*2, kp.radius*4); ctx.fillStyle = '#2ecc71'; ctx.fillRect(kp.x - kp.radius, kp.y - kp.radius, kp.radius*2, 10); }
+            });
+
+            cyberTrucks.forEach(ct => {
+                if (ct.warningTimer > 0) { ctx.fillStyle = 'rgba(231, 76, 60, 0.3)'; ctx.fillRect(0, ct.y - ct.height/2, canvas.width, ct.height); } 
+                else { ctx.fillStyle = '#7f8c8d'; ctx.fillRect(ct.x, ct.y - ct.height/2, ct.width, ct.height); ctx.fillStyle = '#95a5a6'; ctx.beginPath(); ctx.moveTo(ct.x, ct.y + ct.height/2); ctx.lineTo(ct.x + ct.width/2, ct.y - ct.height/2 - 20); ctx.lineTo(ct.x + ct.width, ct.y + ct.height/2); ctx.fill(); }
+            });
+
+            starlinks.forEach(sl => {
+                ctx.beginPath(); ctx.arc(sl.x, sl.y, sl.radius, 0, Math.PI * 2); ctx.fillStyle = 'rgba(231, 76, 60, 0.2)'; ctx.fill(); ctx.strokeStyle = '#e74c3c'; ctx.lineWidth = 3; ctx.stroke();
+                ctx.beginPath(); ctx.arc(sl.x, sl.y, sl.radius * (sl.timer / 90), 0, Math.PI * 2); ctx.fillStyle = 'rgba(231, 76, 60, 0.5)'; ctx.fill();
+            });
+
+            xRays.forEach(xr => {
+                ctx.save(); ctx.translate(player.x, player.y); let alpha = xr.timer / 60;
+                if (xr.isRedK) {
+                    ctx.fillStyle = `rgba(231, 76, 60, ${alpha * 0.8})`; ctx.shadowBlur = 20; ctx.shadowColor = '#e74c3c';
+                    ctx.fillRect(-canvas.width * 2, -60, canvas.width * 4, 120); ctx.fillRect(-60, -canvas.width * 2, 120, canvas.width * 4);
+                    ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`; ctx.fillRect(-canvas.width * 2, -20, canvas.width * 4, 40); ctx.fillRect(-20, -canvas.width * 2, 40, canvas.width * 4);
+                } else {
+                    ctx.rotate(Math.PI / 4); ctx.fillStyle = `rgba(0, 255, 255, ${alpha * 0.8})`; ctx.shadowBlur = 20; ctx.shadowColor = '#0ff';
+                    ctx.fillRect(-canvas.width * 2, -50, canvas.width * 4, 100); ctx.fillRect(-50, -canvas.width * 2, 100, canvas.width * 4);
+                    ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`; ctx.fillRect(-canvas.width * 2, -20, canvas.width * 4, 40); ctx.fillRect(-20, -canvas.width * 2, 40, canvas.width * 4);
+                } ctx.restore();
+            });
+
+            enemies.forEach(e => {
+                if (e.isBoss && e.bossType === 1) { ctx.beginPath(); ctx.arc(e.x, e.y, 300, 0, Math.PI * 2); ctx.fillStyle = 'rgba(231, 76, 60, 0.2)'; ctx.fill(); ctx.strokeStyle = 'rgba(231, 76, 60, 0.8)'; ctx.lineWidth = 4; ctx.stroke(); }
+            });
+
+            if (player.hasBoss1Skill) {
+                ctx.beginPath(); ctx.arc(player.x, player.y, 200, 0, Math.PI * 2); ctx.fillStyle = 'rgba(241, 196, 15, 0.15)'; ctx.fill(); ctx.strokeStyle = 'rgba(243, 156, 18, 0.7)'; ctx.lineWidth = 3; ctx.stroke();
+            }
+
+            blackHoles.forEach(bh => {
+                ctx.save(); ctx.translate(bh.x, bh.y); ctx.rotate(frameCount * 0.1);
+                let color = bh.isPlayer ? '142, 68, 173' : '52, 152, 219'; 
+                ctx.beginPath(); ctx.arc(0, 0, 50, 0, Math.PI*2); ctx.fillStyle = '#000'; ctx.fill();
+                ctx.shadowBlur = 30; ctx.shadowColor = `rgb(${color})`; ctx.strokeStyle = `rgba(${color}, 0.8)`; ctx.lineWidth = 8; ctx.stroke();
+                for(let i=0; i<8; i++) {
+                    ctx.beginPath(); ctx.arc(0, 0, 50 + (frameCount*2 + i*20)%100, (Math.PI*2/8)*i, (Math.PI*2/8)*(i+0.5));
+                    ctx.strokeStyle = `rgba(${color}, 0.4)`; ctx.lineWidth = 4; ctx.stroke();
+                } ctx.restore();
+            });
+
+            ultimates.forEach(u => {
+                ctx.save(); let alpha = u.timer / u.maxTimer; ctx.fillStyle = `rgba(243, 229, 171, ${alpha * 0.4})`;  ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.translate(canvas.width/2, canvas.height/2); ctx.scale(2 + (1-alpha)*3, 2 + (1-alpha)*3);  ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+                ctx.lineWidth = 8; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath();
+                ctx.moveTo(0, 60); ctx.quadraticCurveTo(60, 0, 0, -60); ctx.quadraticCurveTo(-60, 0, 0, 60); ctx.moveTo(0, 60); ctx.lineTo(0, -50);
+                ctx.moveTo(0, 30); ctx.lineTo(30, 0); ctx.moveTo(0, 30); ctx.lineTo(-30, 0); ctx.moveTo(0, -10); ctx.lineTo(25, -35); ctx.moveTo(0, -10); ctx.lineTo(-25, -35);
+                ctx.stroke(); ctx.restore();
+            });
+
+            iceZones.forEach(z => {
+                ctx.fillStyle = 'rgba(78, 52, 46, 0.4)'; ctx.beginPath(); ctx.arc(z.x, z.y, z.r, 0, Math.PI*2); ctx.fill(); ctx.strokeStyle = 'rgba(109, 76, 65, 0.6)'; ctx.lineWidth = 3; ctx.stroke();
+                ctx.fillStyle = 'rgba(52, 152, 219, 0.15)'; ctx.beginPath(); ctx.arc(z.x, z.y, z.r * 0.7, 0, Math.PI*2); ctx.fill(); ctx.save(); ctx.translate(z.x, z.y);
+                ctx.fillStyle = '#8d6e63'; ctx.fillRect(-25, -5, 50, 10); ctx.fillRect(-25, -60, 5, 60); ctx.fillRect(20, -60, 5, 60);
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.5)'; ctx.beginPath(); ctx.arc(0, -15, 12, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#4e342e'; ctx.beginPath(); ctx.arc(0, -12, 9, 0, Math.PI*2); ctx.fill();
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(0, -27); ctx.lineTo(10, -32); ctx.lineTo(-10, -37); ctx.lineTo(0, -42); ctx.stroke();
+                ctx.fillStyle = 'rgba(200, 230, 255, 0.6)'; ctx.beginPath(); ctx.moveTo(-15, -60); ctx.lineTo(15, -60); ctx.lineTo(10, -45); ctx.lineTo(-10, -45); ctx.fill();
+                ctx.fillStyle = '#ffffff'; ctx.fillRect(-8, -58, 6, 6); ctx.fillRect(2, -55, 6, 6); ctx.fillRect(-4, -50, 6, 6); ctx.restore();
+            });
+
+            explosions.forEach(exp => {
+                ctx.save();
+                if (exp.isRed) { ctx.fillStyle = `rgba(231, 76, 60, ${exp.alpha * 0.5})`; ctx.strokeStyle = `rgba(192, 57, 43, ${exp.alpha})`; }
+                else { ctx.fillStyle = `rgba(243, 229, 171, ${exp.alpha})`; ctx.strokeStyle = `rgba(255, 255, 255, ${exp.alpha * 0.8})`; }
+                ctx.beginPath(); ctx.arc(exp.x, exp.y, exp.currentRadius * 0.8, 0, Math.PI * 2); ctx.fill();
+                ctx.lineWidth = 8; ctx.beginPath(); ctx.arc(exp.x, exp.y, exp.currentRadius, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+            });
+
+            mimicChests.forEach(c => {
+                ctx.fillStyle = '#8e44ad'; ctx.fillRect(c.x - c.radius, c.y - c.radius, c.radius*2, c.radius*1.5);
+                ctx.fillStyle = '#f1c40f'; ctx.fillRect(c.x - c.radius/4, c.y - c.radius/4, c.radius/2, c.radius/2);
+                ctx.fillStyle = '#fff'; ctx.font = 'bold 14px Arial'; ctx.fillText(Math.ceil(c.timer/60), c.x, c.y-c.radius-10);
+            });
+
+            zoltraaks.forEach(z => {
+                ctx.save(); ctx.translate(z.x, z.y); ctx.rotate(z.angle);
+                if (!z.isPlayer) {
+                    if (z.timer > 60) {
+                        ctx.strokeStyle = z.isPurple ? 'rgba(142, 68, 173, 0.5)' : 'rgba(231, 76, 60, 0.5)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(2000, 0); ctx.stroke();
+                        ctx.beginPath(); ctx.arc(0, 0, 50 + Math.random()*20, 0, Math.PI*2); ctx.strokeStyle = z.isPurple ? 'rgba(155, 89, 182, 0.8)' : 'rgba(142, 68, 173, 0.8)'; ctx.lineWidth = 5; ctx.stroke();
+                    } else {
+                        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'; ctx.shadowBlur = 30; ctx.shadowColor = z.isPurple ? '#9b59b6' : '#8e44ad'; ctx.fillRect(0, -60, 2000, 120);
+                        ctx.fillStyle = z.isPurple ? 'rgba(142, 68, 173, 0.8)' : 'rgba(142, 68, 173, 0.6)'; ctx.fillRect(0, -80, 2000, 160);
+                    }
+                } else {
+                    let alpha = z.timer / 60; ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`; ctx.shadowBlur = 30; ctx.shadowColor = '#f1c40f';
+                    ctx.fillRect(0, -40, 2000, 80); ctx.fillStyle = `rgba(241, 196, 15, ${alpha * 0.6})`; ctx.fillRect(0, -60, 2000, 120);
+                } ctx.restore();
+            });
+
+            bossBullets.forEach(bb => {
+                ctx.beginPath(); ctx.arc(bb.x, bb.y, bb.radius, 0, Math.PI * 2);
+                ctx.fillStyle = bb.type === 'mimicArrow' ? '#9b59b6' : '#2ecc71'; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+            });
+
+            bullets.forEach(b => {
+                if (b.type === 'aeropress' || b.type === 'stolen2') return;
+                ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.angle + Math.PI/2); let w=b.radius*1.5; let h=b.radius*2;
+                if (b.type==='americano') {
+                    ctx.fillStyle='#f5f5f5'; ctx.beginPath(); ctx.moveTo(-w/2,-h/2); ctx.lineTo(w/2,-h/2); ctx.lineTo(w/2*0.7,h/2); ctx.lineTo(-w/2*0.7,h/2); ctx.fill();
+                    ctx.fillStyle='#c89e72'; ctx.beginPath(); ctx.moveTo(-w/2*0.85,-h/8); ctx.lineTo(w/2*0.85,-h/8); ctx.lineTo(w/2*0.75,h/4); ctx.lineTo(-w/2*0.75,h/4); ctx.fill();
+                    ctx.fillStyle='#222'; ctx.beginPath(); ctx.ellipse(0,-h/2,w/2+2,4,0,0,Math.PI*2); ctx.fill();
+                } else if (b.type==='latte') {
+                    ctx.fillStyle='#f3e5ab'; ctx.beginPath(); ctx.arc(0,0,b.radius,0,Math.PI*2); ctx.fill(); ctx.strokeStyle='#c89e72'; ctx.lineWidth=4; ctx.stroke();
+                    ctx.beginPath(); ctx.arc(b.radius,0,8,-Math.PI/2,Math.PI/2); ctx.stroke();
+                } else if (b.type==='coldBrew' && b.fall) {
+                    ctx.fillStyle='rgba(173, 216, 230, 0.8)'; ctx.fillRect(-b.radius,-b.radius,b.radius*2,b.radius*2); ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.strokeRect(-b.radius,-b.radius,b.radius*2,b.radius*2);
+                } ctx.restore();
+            });
+
+            if (bullets.some(b => b.type === 'aeropress')) {
+                bullets.forEach(b => {
+                    if (b.type==='aeropress') {
+                        ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.angle + Math.PI/2);
+                        ctx.fillStyle='rgba(155, 89, 182, 0.4)'; ctx.beginPath(); ctx.arc(0,0,b.radius,0,Math.PI*2); ctx.fill(); ctx.strokeStyle='#8e44ad'; ctx.lineWidth=6; ctx.stroke();
+                        ctx.fillStyle='rgba(255, 255, 255, 0.8)'; ctx.beginPath(); ctx.arc(-b.radius*0.3, -b.radius*0.3, b.radius*0.2, 0, Math.PI*2); ctx.fill(); ctx.restore();
+                    }
+                });
+            }
+
+            if (player.hasStarRing) {
+                ctx.save(); ctx.translate(player.x, player.y); ctx.rotate(player.starRingAngle * 0.5);
+                ctx.beginPath(); ctx.arc(0, 0, 110, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(230, 126, 34, 0.8)'; ctx.lineWidth = 6; ctx.stroke();
+                ctx.fillStyle = 'rgba(241, 196, 15, 0.15)'; ctx.fill();
+                for(let j=0; j<6; j++) {
+                    ctx.beginPath(); ctx.moveTo(0, -110); ctx.lineTo(110*Math.cos(Math.PI/6), 110*Math.sin(Math.PI/6)); ctx.lineTo(-110*Math.cos(Math.PI/6), 110*Math.sin(Math.PI/6));
+                    ctx.closePath(); ctx.strokeStyle = 'rgba(241, 196, 15, 0.4)'; ctx.lineWidth = 3; ctx.stroke(); ctx.rotate(Math.PI/3);
+                }
+                ctx.restore();
+
+                let cups = 5; let radius = 110;
+                for(let i=0; i<cups; i++) {
+                    let a = player.starRingAngle + (Math.PI * 2 / cups) * i; let cx = player.x + Math.cos(a) * radius; let cy = player.y + Math.sin(a) * radius;
+                    ctx.save(); ctx.translate(cx, cy); ctx.rotate(a + Math.PI/2); 
+                    ctx.fillStyle = '#d35400'; ctx.beginPath(); ctx.moveTo(-20, -15); ctx.lineTo(20, -15); ctx.lineTo(15, 20); ctx.lineTo(-15, 20); ctx.fill();
+                    ctx.fillStyle = '#f1c40f'; ctx.shadowBlur = 30; ctx.shadowColor = '#e74c3c'; 
+                    ctx.beginPath(); ctx.moveTo(-15, -15); ctx.lineTo(15, -15); ctx.lineTo(10, 15); ctx.lineTo(-10, 15); ctx.fill();
+                    ctx.restore();
+                }
+            }
+
+            twitterBirds.forEach(tb => {
+                ctx.beginPath(); ctx.arc(tb.x, tb.y, tb.radius, 0, Math.PI * 2);
+                ctx.fillStyle = '#1DA1F2'; ctx.fill();
+                ctx.fillStyle = 'white'; ctx.font = 'bold 24px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText('t', tb.x, tb.y);
+            });
+
+            ctx.textAlign='center'; ctx.textBaseline='middle';
+            const regularEnemies = enemies.filter(e => !e.isBoss && !e.isMiniBoss);
+            const miniBossEnemies = enemies.filter(e => e.isMiniBoss);
+            const bossEnemies = enemies.filter(e => e.isBoss);
+
+            const renderEnemy = (e) => {
+                if (e.isGoblin) {
+                    ctx.save(); ctx.beginPath(); ctx.arc(e.x, e.y - 15, e.size * 1.5, 0, Math.PI * 2);
+                    let grad = ctx.createRadialGradient(e.x, e.y - 15, e.size * 0.5, e.x, e.y - 15, e.size * 1.5);
+                    grad.addColorStop(0, 'rgba(46, 204, 113, 0.8)'); grad.addColorStop(1, 'rgba(46, 204, 113, 0)');
+                    ctx.fillStyle = grad; ctx.fill(); ctx.restore();
+                }
+
+                if (e.type === 'emoji') {
+                    ctx.font='60px Arial'; ctx.fillText(e.emoji, e.x, e.y);
+                } else {
+                    if (e.img && e.img.complete && e.img.naturalHeight !== 0) {
+                        const ar = e.img.naturalWidth / e.img.naturalHeight; let tw = 100;
+                        if (e.isBoss) {
+                            if (e.bossType === 3 || e.bossType === 4 || e.bossType === 1 || e.bossType === 2) tw = 250; 
+                            else if (e.bossType === 5) tw = 120;
+                            else if (e.bossType === 6) tw = 200; 
+                            else if (e.bossType === 7) tw = 300;
+                        } else if (e.isMiniBoss && e.bossType === 5) tw = 80;
+                        const th = tw / ar; ctx.drawImage(e.img, e.x - tw/2, e.y - th/2, tw, th);
+                    }
+                }
+                
+                if (e.hp < e.maxHp && !e.hideHpBar && !e.isEntering) {
+                    if (e.isBoss) {
+                        const bw = 250; const bh = 15;
+                        ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(e.x - bw/2, e.y - 200, bw, bh);
+                        ctx.fillStyle = '#e74c3c'; ctx.fillRect(e.x - bw/2, e.y - 200, bw * (e.hp / e.maxHp), bh);
+                        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(e.x - bw/2, e.y - 200, bw, bh);
+                    } else {
+                        ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(e.x-30,e.y-45,60,6);
+                        ctx.fillStyle='#2ecc71'; ctx.fillRect(e.x-30,e.y-45,60*(e.hp/e.maxHp),6);
+                    }
+                }
+
+                if (e.isBoss && e.invulTimer > 0 && e.bossType !== 7) {
+                    ctx.save(); ctx.beginPath(); ctx.arc(e.x, e.y, e.size * 1.5, 0, Math.PI * 2); ctx.fillStyle = 'rgba(52, 152, 219, 0.3)'; ctx.fill();
+                    ctx.strokeStyle = '#2980b9'; ctx.lineWidth = 6; ctx.setLineDash([10, 10]); ctx.stroke();
+                    ctx.fillStyle = '#fff'; ctx.font = 'bold 24px 微軟正黑體'; ctx.textAlign = 'center';
+                    let statusText = e.bossType === 4 ? "跌停鎖死" : (e.bossType === 6 && e.invulTimer <= 300 ? "領域展開" : "絕對防禦");
+                    ctx.fillText(`${statusText}: ${Math.ceil(e.invulTimer/60)}s`, e.x, e.y - e.size - 20); ctx.restore();
+                }
+            };
+
+            regularEnemies.forEach(renderEnemy);
+            miniBossEnemies.forEach(renderEnemy);
+            bossEnemies.forEach(renderEnemy);
+
+            ctx.font='bold 24px Arial'; ctx.textAlign='center';
+            damageNumbers.forEach(d => { ctx.lineWidth=3; ctx.strokeStyle='#000'; ctx.strokeText(d.text, d.x, d.y); ctx.fillStyle=d.color; ctx.fillText(d.text, d.x, d.y); });
+
+            const hw=300; const hh=24; const hx=canvas.width-hw-30; const hy=canvas.height-42;
+
+            if (isUIHidden <= 0) {
+                // 為透明背景加上文字陰影，確保在各種背景下都看得清楚
+                ctx.save();
+                ctx.shadowColor = 'rgba(0,0,0,0.8)';
+                ctx.shadowBlur = 5;
+                ctx.shadowOffsetX = 2;
+                ctx.shadowOffsetY = 2;
+
+                ctx.fillStyle='#f1c40f'; ctx.font='bold 28px 微軟正黑體'; ctx.textAlign='left'; ctx.fillText(`LV. ${level}`, 30, canvas.height-30);
+
+                let ls = Object.keys(skillData).filter(k=>skillData[k].isLearned).map(k=>skillData[k].name).join(', ');
+                ctx.fillStyle='#ecf0f1'; ctx.font='16px 微軟正黑體'; ctx.fillText(`已學: ${ls}`, 140, canvas.height-30);
+
+                // --- 存活時間顯示 ---
+                let totalSecs = Math.floor(frameCount / 60);
+                let m = Math.floor(totalSecs / 60).toString().padStart(2, '0');
+                let s = (totalSecs % 60).toString().padStart(2, '0');
+                ctx.fillStyle = '#ecf0f1'; ctx.font = 'bold 18px 微軟正黑體'; ctx.textAlign = 'right';
+                ctx.fillText(`⏱️ 存活時間: ${m}:${s}`, hx + hw, hy - 10);
+
+                // 復活次數顯示
+                if (player.revives > 0) {
+                    ctx.fillStyle = '#f1c40f'; ctx.font = 'bold 18px 微軟正黑體'; ctx.textAlign = 'left';
+                    ctx.fillText(`👼 復活次數: ${player.revives}`, hx, hy - 10);
+                }
+
+                // 畫形狀時關閉陰影
+                ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+
+                ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.strokeRect(hx,hy,hw,hh);
+                const hr=player.hp/player.maxHp; ctx.fillStyle=hr>0.3?'#e74c3c':'#c0392b'; ctx.fillRect(hx+2,hy+2,(hw-4)*hr,hh-4);
+                
+                // 血量數字恢復陰影
+                ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4; ctx.shadowOffsetX = 2; ctx.shadowOffsetY = 2;
+                ctx.fillStyle='#fff'; ctx.font='bold 16px Arial'; ctx.textAlign='center'; ctx.fillText(`${player.hp} / ${player.maxHp}`, hx+hw/2, canvas.height-30);
+
+                if (player.damageMultiplier > 1) {
+                    const buffX = hx - 45; const buffY = hy + hh / 2;
+                    ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+                    ctx.beginPath(); ctx.arc(buffX, buffY, 18, 0, Math.PI * 2); ctx.fillStyle = '#e74c3c'; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+                    ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4; ctx.shadowOffsetX = 2; ctx.shadowOffsetY = 2;
+                    ctx.fillStyle = '#fff'; ctx.font = 'bold 16px 微軟正黑體'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('哥', buffX, buffY);
+                    ctx.fillStyle = '#f1c40f'; ctx.font = 'bold 16px Arial'; ctx.textAlign = 'left'; ctx.fillText(`x${player.damageMultiplier}`, buffX + 25, buffY);
+                }
+
+                if (skillData[SKILL_TYPES.ULULTIMATE].isLearned) {
+                    ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+                    let globalCdMult = isTariffActive ? 2 : 1;
+                    const orbX = canvas.width - 60; const orbY = canvas.height - 110; const orbRadius = 30;
+                    let ultBaseCd = player.ultimateUpgraded ? 600 : 1200;
+                    let ultCd = ultBaseCd * globalCdMult; 
+                    let framesSinceFired = frameCount - skillData[SKILL_TYPES.ULULTIMATE].lastFiredFrame;
+                    let chargeRatio = Math.min(1, framesSinceFired / ultCd);
+                    
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'; ctx.beginPath(); ctx.arc(orbX, orbY, orbRadius, 0, Math.PI * 2); ctx.fill();
+                    ctx.save(); ctx.beginPath(); ctx.arc(orbX, orbY, orbRadius, 0, Math.PI * 2); ctx.clip(); 
+                    let fillHeight = orbRadius * 2 * chargeRatio;
+                    ctx.fillStyle = isUltimateReady ? '#f1c40f' : '#e67e22'; ctx.fillRect(orbX - orbRadius, orbY + orbRadius - fillHeight, orbRadius * 2, fillHeight); ctx.restore();
+                    
+                    ctx.strokeStyle = isUltimateReady ? '#fff' : '#7f8c8d'; ctx.lineWidth = isUltimateReady ? 4 : 2; ctx.beginPath(); ctx.arc(orbX, orbY, orbRadius, 0, Math.PI * 2); ctx.stroke();
+                    
+                    ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4; ctx.shadowOffsetX = 2; ctx.shadowOffsetY = 2;
+                    if (isUltimateReady) {
+                        ctx.shadowBlur = 0; ctx.strokeStyle = '#f1c40f'; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(orbX, orbY, orbRadius, 0, Math.PI * 2); ctx.stroke();
+                        ctx.shadowBlur = 4; ctx.fillStyle = '#fff'; ctx.font = 'bold 16px Arial'; ctx.textAlign = 'center'; ctx.fillText('SPACE', orbX, orbY + 5);
+                    } else { ctx.fillStyle = '#ecf0f1'; ctx.font = '14px Arial'; ctx.textAlign = 'center'; ctx.fillText(`${Math.ceil((ultCd - framesSinceFired)/60)}s`, orbX, orbY + 5); }
+                }
+                ctx.restore();
+
+                if (player.hasCaffeineFever && player.caffeineStacks > 0) {
+                    ctx.save(); ctx.translate(player.x, player.y); let intensity = player.caffeineStacks / (player.caffeineUpgraded ? 100 : 40); 
+                    ctx.beginPath(); ctx.arc(0, 0, player.collisionRadius + 15 + (intensity * 40), 0, Math.PI * 2); ctx.fillStyle = `rgba(241, 196, 15, ${0.1 + intensity * 0.25})`; ctx.fill();
+                    let particleCount = Math.floor(5 + intensity * 20); let timeA = frameCount * (0.05 + intensity * 0.08); 
+                    for(let i = 0; i < particleCount; i++) {
+                        let angle = timeA + (Math.PI * 2 / particleCount) * i; let orbitRadius = player.collisionRadius + 20 + (intensity * 30) + Math.sin(frameCount * 0.15 + i) * 8;
+                        let px = Math.cos(angle) * orbitRadius; let py = Math.sin(angle) * orbitRadius;
+                        ctx.beginPath(); ctx.arc(px, py, 4 + intensity * 8, 0, Math.PI * 2); ctx.fillStyle = i % 2 === 0 ? '#f1c40f' : '#e67e22'; ctx.shadowBlur = 15; ctx.shadowColor = '#f39c12'; ctx.fill();
+                    } ctx.restore();
+                    ctx.fillStyle = '#f1c40f'; ctx.font = 'bold 18px 微軟正黑體'; ctx.textAlign = 'center';
+                    let buffPerStack = player.caffeineUpgraded ? 20 : 8.5;
+                    let bonusText = `+${Math.floor(player.caffeineStacks * buffPerStack)}%`; ctx.fillText(`🔥 ${player.caffeineStacks}層 (${bonusText})`, player.x, player.y - player.collisionRadius - 30);
+                }
+            } else {
+                ctx.fillStyle = 'rgba(231, 76, 60, 0.85)'; ctx.fillRect(0, canvas.height / 2 - 80, canvas.width, 160);
+                ctx.fillStyle = '#fff'; ctx.font = 'bold 56px 微軟正黑體'; ctx.textAlign = 'left';
+                let offset = (frameCount * 8) % (canvas.width + 1200);
+                ctx.fillText("⚠️ BREAKING NEWS: FAKE NEWS! UI BLOCKED! GREAT WALL! ⚠️", canvas.width - offset, canvas.height / 2);
+                
+                if (player.revives > 0 && frameCount % 60 < 30) {
+                    ctx.fillStyle = '#f1c40f'; ctx.font = 'bold 14px 微軟正黑體'; ctx.textAlign = 'center';
+                    ctx.fillText(`👼x${player.revives}`, player.x, player.y - player.collisionRadius - 15);
+                }
+            }
+
+            if (isTariffActive) {
+                ctx.fillStyle = 'rgba(192, 57, 43, 0.6)'; ctx.fillRect(0, 0, canvas.width, 40);
+                ctx.fillStyle = '#fff'; ctx.font = 'bold 24px 微軟正黑體'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText("⚠️ 關稅壁壘生效中：全技能冷卻時間 x2 / 移動速度減半 ⚠️", canvas.width / 2, 20);
+            }
+
+            if (hasWon) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.85)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#f1c40f'; ctx.font = 'bold 64px 微軟正黑體'; ctx.textAlign = 'center'; ctx.fillText("恭喜破關！", canvas.width/2, canvas.height/2 - 20);
+                ctx.fillStyle = '#ecf0f1'; ctx.font = '24px 微軟正黑體'; ctx.fillText(`萃比成功撐過了 TRUMP 的考驗，守護了台北市的咖啡因！`, canvas.width/2, canvas.height/2 + 30);
+                ctx.fillStyle = '#e74c3c'; ctx.font = 'bold 20px Arial'; ctx.fillText(`總擊殺喪屍數: ${score} / 剩餘復活次數: ${player.revives}`, canvas.width/2, canvas.height/2 + 80);
+            }
+            else if (isPaused && !isUpgrading && !isInfoMenu && player.hp > 0) {
+                ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0,0,canvas.width,canvas.height);
+                ctx.fillStyle = '#f1c40f'; ctx.font = 'bold 64px 微軟正黑體'; ctx.textAlign = 'center'; ctx.fillText("營業暫停", canvas.width/2, canvas.height/2 - 20);
+                ctx.fillStyle = '#ecf0f1'; ctx.font = '24px 微軟正黑體'; ctx.fillText("按下 [P] 鍵恢復營業", canvas.width/2, canvas.height/2 + 30);
+            }
+            else if (player.hp<=0) {
+                ctx.fillStyle='rgba(0,0,0,0.85)'; ctx.fillRect(0,0,canvas.width,canvas.height);
+                ctx.fillStyle='#e74c3c'; ctx.font='bold 64px 微軟正黑體'; ctx.textAlign='center'; ctx.fillText("當日營業結束", canvas.width/2, canvas.height/2);
+                ctx.fillStyle='#ecf0f1'; ctx.font='24px 微軟正黑體'; ctx.fillText(`萃比在 LV.${level} 被缺乏咖啡因的喪屍淹沒了...`, canvas.width/2, canvas.height/2+60);
+            }
+
+            if (playerImg.complete && playerImg.naturalHeight !== 0) {
+                const ar = playerImg.naturalWidth / playerImg.naturalHeight; const tw = 160; const th = tw/ar;
+                if (player.invulTimer > 0 && frameCount % 10 < 5) ctx.globalAlpha = 0.5;
+                ctx.drawImage(playerImg, player.x - tw/2, player.y - th/2, tw, th); ctx.globalAlpha = 1.0;
+            }
+
+            if (player.shield > 0) {
+                ctx.beginPath(); ctx.arc(player.x, player.y, player.collisionRadius + 10, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(46, 204, 113, 0.8)'; ctx.lineWidth = 4; ctx.stroke();
+                ctx.fillStyle = '#2ecc71'; ctx.font = 'bold 16px Arial'; ctx.fillText(`x${player.shield}`, player.x + player.collisionRadius, player.y - player.collisionRadius);
+            }
+
+            if (player.shoutTimer>0) {
+                ctx.font='bold 24px 微軟正黑體'; ctx.textAlign='center'; ctx.lineWidth=4;
+                const fy=player.y-90-(180-player.shoutTimer)*0.12;
+                ctx.strokeStyle='#2c3e50'; ctx.strokeText(player.shoutText, player.x, fy);
+                ctx.fillStyle='#f1c40f'; ctx.fillText(player.shoutText, player.x, fy);
+            }
+
+            ctx.restore();
+        }
+
+        function gameLoop() { if (!isPaused && !hasWon) { update(); } draw(); requestAnimationFrame(gameLoop); }
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
