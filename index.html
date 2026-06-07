@@ -1376,6 +1376,7 @@
                             else if (e.bossType === 6) tw = 100; 
                             else if (e.bossType === 7) tw = 150;
                         } else if (e.isMiniBoss && e.bossType === 5) tw = 50;
+                        const th = tw / ar;
                         ctx.drawImage(e.img, e.x - (tw*0.5)/2, e.y - (th*0.5)/2, tw*0.5, th*0.5);
                     }
                 }
