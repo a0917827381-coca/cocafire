@@ -228,7 +228,7 @@
         
         let currentExp = 0;
         let expToNextLevel = 20;
-        let pendingUpgrades = 0;
+        let pendingUpgrades = 3; // 初始等級1連跳3次
         let postUltDelay = 0;
         
         let killCountForGoblin = 0;
@@ -475,10 +475,7 @@
             if (e.type !== 'emoji') {
                 let tw = 100;
                 if (e.isBoss) {
-                    if (e.bossType === 3 || e.bossType === 4 || e.bossType === 1 || e.bossType === 2) tw = 250; 
-                    else if (e.bossType === 5) tw = 120;
-                    else if (e.bossType === 6) tw = 200; 
-                    else if (e.bossType === 7) tw = 300;
+                    tw = 120; // 統一放大為120
                 } else if (e.isMiniBoss && e.bossType === 5) tw = 80;
                 marginX = tw / 2;
                 if (e.img && e.img.complete && e.img.naturalHeight) marginY = (tw / (e.img.naturalWidth / e.img.naturalHeight)) / 2;
@@ -536,14 +533,6 @@
             if (keys.a || keys.ArrowLeft) moveX -= player.speed;
             if (keys.d || keys.ArrowRight) moveX += player.speed;
 
-            // --- update() 內部的移動計算區塊 ---
-
-            // 鍵盤移動維持不變
-            if (keys.w || keys.ArrowUp) moveY -= player.speed;
-            if (keys.s || keys.ArrowDown) moveY += player.speed;
-            if (keys.a || keys.ArrowLeft) moveX -= player.speed;
-            if (keys.d || keys.ArrowRight) moveX += player.speed;
-
             // 替換原本的 touchTarget 為動態搖桿邏輯
             if (joystick.active) {
                 let dx = joystick.currentX - joystick.originX;
@@ -581,6 +570,28 @@
 
             if (player.hasStarRing) {
                 player.starRingAngle += 0.15; let cups = 5; let radius = 110;
+                
+                // 處理王級敵人3秒彈開機制
+                enemies.forEach(en => {
+                    if (en.isBoss && !en.isEntering) {
+                        let dist = getDistance(player.x, player.y, en.x, en.y);
+                        if (dist < radius + 25 + en.size) {
+                            en.starRingContactTime = (en.starRingContactTime || 0) + 1;
+                            if (en.starRingContactTime >= 180) { // 3秒 (60幀/秒)
+                                let angle = Math.atan2(player.y - en.y, player.x - en.x);
+                                player.x += Math.cos(angle) * 400; // 彈開玩家
+                                player.y += Math.sin(angle) * 400;
+                                player.x = Math.max(player.collisionRadius, Math.min(canvas.width - player.collisionRadius, player.x));
+                                player.y = Math.max(player.collisionRadius, Math.min(canvas.height - player.collisionRadius - 60, player.y));
+                                en.starRingContactTime = 0; // 重置計時
+                                damageNumbers.push({x: player.x, y: player.y - 50, text: `⚠️過載彈開!`, timer: 60, color: '#e74c3c'});
+                            }
+                        } else {
+                            if (en.starRingContactTime > 0) en.starRingContactTime--;
+                        }
+                    }
+                });
+
                 for(let i=0; i<cups; i++) {
                     let a = player.starRingAngle + (Math.PI * 2 / cups) * i;
                     let cx = player.x + Math.cos(a) * radius; let cy = player.y + Math.sin(a) * radius;
@@ -982,18 +993,18 @@
 
             for (let i = ultimates.length - 1; i >= 0; i--) { ultimates[i].timer--; if (ultimates[i].timer <= 0) ultimates.splice(i, 1); }
 
-            if (level >= 40 && !boss1Spawned) { boss1Spawned = true; enemies.push({ x: canvas.width/2, y: -250, size: 50, bs: 0.4, speed: 0.4, hp: 100*hpMultiplier*150, maxHp: 100*hpMultiplier*150, bTimer: 0, type: 'img', img: boss1Img, isBoss: true, bossType: 1, attackTimer: 0, invulTimer: 0, hasTriggeredInvul: false, isEntering: true }); }
-            if (level >= 50 && !boss2Spawned) { boss2Spawned = true; enemies.push({ x: canvas.width/2, y: -250, size: 50, bs: 0.5, speed: 0.5, hp: 100*hpMultiplier*250, maxHp: 100*hpMultiplier*250, bTimer: 0, type: 'img', img: nvidaImg, isBoss: true, bossType: 2, attackTimer: 0, invulTimer: 0, hasTriggeredInvul: false, isEntering: true }); }
-            if (level >= 60 && !boss3Spawned) { boss3Spawned = true; enemies.push({ x: canvas.width/2, y: -250, size: 50, bs: 0.6, speed: 0.6, hp: 100*hpMultiplier*500, maxHp: 100*hpMultiplier*500, bTimer: 0, type: 'img', img: mkImg, isBoss: true, bossType: 3, attackTimer: 0, invulTimer: 0, hasTriggeredInvul: false, isEntering: true }); }
-            if (level >= 70 && !boss4Spawned) { boss4Spawned = true; enemies.push({ x: canvas.width/2, y: -250, size: 50, bs: 0.45, speed: 0.45, hp: 100*hpMultiplier*600, maxHp: 100*hpMultiplier*600, bTimer: 0, type: 'img', img: boss4Img, isBoss: true, bossType: 4, attackTimer: 0, invulTimer: 0, hasTriggeredInvul: false, isEntering: true }); }
+            if (level >= 40 && !boss1Spawned) { boss1Spawned = true; enemies.push({ x: canvas.width/2, y: -250, size: 30, bs: 0.4, speed: 0.4, hp: 100*hpMultiplier*150, maxHp: 100*hpMultiplier*150, bTimer: 0, type: 'img', img: boss1Img, isBoss: true, bossType: 1, attackTimer: 0, invulTimer: 0, hasTriggeredInvul: false, isEntering: true }); }
+            if (level >= 50 && !boss2Spawned) { boss2Spawned = true; enemies.push({ x: canvas.width/2, y: -250, size: 30, bs: 0.5, speed: 0.5, hp: 100*hpMultiplier*250, maxHp: 100*hpMultiplier*250, bTimer: 0, type: 'img', img: nvidaImg, isBoss: true, bossType: 2, attackTimer: 0, invulTimer: 0, hasTriggeredInvul: false, isEntering: true }); }
+            if (level >= 60 && !boss3Spawned) { boss3Spawned = true; enemies.push({ x: canvas.width/2, y: -250, size: 30, bs: 0.6, speed: 0.6, hp: 100*hpMultiplier*500, maxHp: 100*hpMultiplier*500, bTimer: 0, type: 'img', img: mkImg, isBoss: true, bossType: 3, attackTimer: 0, invulTimer: 0, hasTriggeredInvul: false, isEntering: true }); }
+            if (level >= 70 && !boss4Spawned) { boss4Spawned = true; enemies.push({ x: canvas.width/2, y: -250, size: 30, bs: 0.45, speed: 0.45, hp: 100*hpMultiplier*600, maxHp: 100*hpMultiplier*600, bTimer: 0, type: 'img', img: boss4Img, isBoss: true, bossType: 4, attackTimer: 0, invulTimer: 0, hasTriggeredInvul: false, isEntering: true }); }
             if (level >= 80 && !boss5Spawned) { boss5Spawned = true; enemies.push({ x: canvas.width/2, y: -250, size: 30, bs: 0.1, speed: 0.1, hp: 100*hpMultiplier*1000, maxHp: 100*hpMultiplier*1000, bTimer: 0, type: 'img', img: flImg, isBoss: true, bossType: 5, attackTimer: 0, invulTimer: 0, hasTriggeredInvul: false, isEntering: true, hideHpBar: true, castZoltraak: 0 }); }
-            if (level >= 90 && !boss6Spawned) { boss6Spawned = true; enemies.push({ x: canvas.width/2, y: -250, size: 60, bs: 0.8, speed: 0.8, hp: 100*hpMultiplier*2000, maxHp: 100*hpMultiplier*2000, bTimer: 0, type: 'img', img: boss6Img, isBoss: true, bossType: 6, attackTimer: 0, invulTimer: 0, hasTriggeredInvul: false, isEntering: true, hasTriggeredVoid: false }); }
+            if (level >= 90 && !boss6Spawned) { boss6Spawned = true; enemies.push({ x: canvas.width/2, y: -250, size: 30, bs: 0.8, speed: 0.8, hp: 100*hpMultiplier*2000, maxHp: 100*hpMultiplier*2000, bTimer: 0, type: 'img', img: boss6Img, isBoss: true, bossType: 6, attackTimer: 0, invulTimer: 0, hasTriggeredInvul: false, isEntering: true, hasTriggeredVoid: false }); }
             
             if (level >= 100 && !boss7Spawned) {
                 boss7Spawned = true;
                 enemies.length = 0; 
                 bossBullets.length = 0;
-                enemies.push({ x: canvas.width/2, y: -250, size: 80, bs: 0.3, speed: 0.3, hp: 100*hpMultiplier*10000, maxHp: 100*hpMultiplier*10000, bTimer: 0, type: 'img', img: trumpImg, isBoss: true, bossType: 7, attackTimer: 0, invulTimer: 0, hasTriggeredInvul: false, isEntering: true, hasTriggeredTariff: false });
+                enemies.push({ x: canvas.width/2, y: -250, size: 30, bs: 0.3, speed: 0.3, hp: 100*hpMultiplier*10000, maxHp: 100*hpMultiplier*10000, bTimer: 0, type: 'img', img: trumpImg, isBoss: true, bossType: 7, attackTimer: 0, invulTimer: 0, hasTriggeredInvul: false, isEntering: true, hasTriggeredTariff: false });
             }
 
             let effectiveLevelForSpawn = Math.min(level, 60); let spawnTier = Math.floor(effectiveLevelForSpawn / 10);
@@ -1044,7 +1055,7 @@
                             xRays.push({timer: 10, isRedK: false});
                             let bType = Math.floor(Math.random() * 5) + 1;
                             let bImg = [boss1Img, nvidaImg, mkImg, boss4Img, flImg][bType - 1];
-                            let bSize = [100, 100, 100, 100, 40][bType - 1];
+                            let bSize = 30; // 川普招喚的小王也放大
                             enemies.push({
                                 x: e.x + (Math.random()*400-200), y: e.y + (Math.random()*200), size: bSize, bs: 0.5, speed: 0.5,
                                 hp: 100*hpMultiplier*300, maxHp: 100*hpMultiplier*300, bTimer: 0, type: 'img', img: bImg, isBoss: true, bossType: bType,
@@ -1145,7 +1156,14 @@
                     }
                     
                     if(levelsGained > 0 && level < 100) { 
-                        for(let l = level - levelsGained + 1; l <= level; l++) if (l % 3 === 0) pendingUpgrades++;
+                        for(let l = level - levelsGained + 1; l <= level; l++) {
+                            // 新增：升級判斷邏輯
+                            if (l < 30) {
+                                if (l === 10 || l === 20) pendingUpgrades += 3;
+                            } else {
+                                if (l % 3 === 0) pendingUpgrades += 1;
+                            }
+                        }
                     } 
                     enemies.splice(i, 1); continue;
                 }
@@ -1394,10 +1412,7 @@
                     if (e.img && e.img.complete && e.img.naturalHeight !== 0) {
                         const ar = e.img.naturalWidth / e.img.naturalHeight; let tw = 100;
                         if (e.isBoss) {
-                            if (e.bossType === 3 || e.bossType === 4 || e.bossType === 1 || e.bossType === 2) tw = 125; 
-                            else if (e.bossType === 5) tw = 60;
-                            else if (e.bossType === 6) tw = 100; 
-                            else if (e.bossType === 7) tw = 150;
+                            tw = 120; // 改為1.5倍的繪製大小
                         } else if (e.isMiniBoss && e.bossType === 5) tw = 50;
                         const th = tw / ar;
                         ctx.drawImage(e.img, e.x - (tw*0.5)/2, e.y - (th*0.5)/2, tw*0.5, th*0.5);
@@ -1406,10 +1421,10 @@
                 
                 if (e.hp < e.maxHp && !e.hideHpBar && !e.isEntering) {
                     if (e.isBoss) {
-                        const bw = 250; const bh = 15;
-                        ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(e.x - bw/2, e.y - 200, bw, bh);
-                        ctx.fillStyle = '#e74c3c'; ctx.fillRect(e.x - bw/2, e.y - 200, bw * (e.hp / e.maxHp), bh);
-                        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(e.x - bw/2, e.y - 200, bw, bh);
+                        const bw = 150; const bh = 10;
+                        ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(e.x - bw/2, e.y - 80, bw, bh);
+                        ctx.fillStyle = '#e74c3c'; ctx.fillRect(e.x - bw/2, e.y - 80, bw * (e.hp / e.maxHp), bh);
+                        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(e.x - bw/2, e.y - 80, bw, bh);
                     } else {
                         ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(e.x-30,e.y-45,60,6);
                         ctx.fillStyle='#2ecc71'; ctx.fillRect(e.x-30,e.y-45,60*(e.hp/e.maxHp),6);
@@ -1421,7 +1436,7 @@
                     ctx.strokeStyle = '#2980b9'; ctx.lineWidth = 6; ctx.setLineDash([10, 10]); ctx.stroke();
                     ctx.fillStyle = '#fff'; ctx.font = 'bold 24px 微軟正黑體'; ctx.textAlign = 'center';
                     let statusText = e.bossType === 4 ? "跌停鎖死" : (e.bossType === 6 && e.invulTimer <= 300 ? "領域展開" : "絕對防禦");
-                    ctx.fillText(`${statusText}: ${Math.ceil(e.invulTimer/60)}s`, e.x, e.y - e.size - 20); ctx.restore();
+                    ctx.fillText(`${statusText}: ${Math.ceil(e.invulTimer/60)}s`, e.x, e.y - e.size - 40); ctx.restore();
                 }
             };
 
