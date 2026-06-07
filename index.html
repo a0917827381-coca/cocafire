@@ -30,13 +30,35 @@
             min-height: 100vh;       /* 關鍵：讓容器高度至少等於視窗高度 */
         }
 
-        /* 若內容超長，我們讓內部容器可以頂部對齊 */
+        /* 容器：確保卡片水平並排，超出螢幕時可以捲動 */
         .cards-container { 
-            display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; 
-            align-items: center; /* 讓卡片在內容少時居中 */
-            margin-top: 20px; 
-            margin-bottom: 20px;
+            display: flex; 
+            flex-direction: column; /* 手機上垂直排列比較好讀 */
+            gap: 15px; 
+            align-items: center; 
+            width: 100%;
+            max-width: 400px;
+            margin-top: 20px;
         }
+        /* 卡片：恢復原本精緻的樣式 */
+        .card {
+            background: linear-gradient(135deg, #ecf0f1 0%, #bdc3c7 100%);
+            width: 90%; /* 手機上寬度適中 */
+            padding: 15px;
+            border-radius: 15px;
+            color: #2c3e50;
+            cursor: pointer;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+            border: 4px solid #fff;
+            transition: transform 0.2s;
+            text-align: center;
+        }
+
+        .card:hover { transform: scale(1.02); }
+
+        .card-header { font-size: 20px; font-weight: bold; margin-bottom: 5px; }
+        .card-type { font-size: 12px; color: #7f8c8d; text-transform: uppercase; }
+        .card-desc { font-size: 14px; margin-top: 10px; line-height: 1.4; }
 
         /* 確保內容區域不會太高 */
         .info-box {
@@ -440,8 +462,8 @@
                 player.damageMultiplier *= 2; player.maxHp += 100; player.hp = player.maxHp;
             } else if (type === 'ultimate') {
                 title.innerText = "☕ 萃比覺醒！"; subtitle.innerText = "✨ 達到 35 級，解鎖隱藏潛能 ✨";
-                desc.innerHTML = "<strong>【解鎖大絕招：終極拉花大師】</strong><br>螢幕右下角能量條集滿時，按下 <strong style='color:#f1c40f;font-size:26px;'>[空白鍵 SPACE]</strong>，可釋放全螢幕毀滅性拉花攻擊！";
-            }
+                desc.innerHTML = "<strong>【解鎖大絕招：終極拉花大師】</strong><br>每當能量條集滿時，萃比會自動發動<strong style='color:#f1c40f;font-size:26px;'>全螢幕毀滅性拉花攻擊</strong>，掃蕩周圍所有喪屍！";
+                player.hasLimitless = true; // 確保邏輯同步
             infoScreen.style.display = 'flex';
         }
 
@@ -1419,7 +1441,7 @@
                 ctx.shadowOffsetX = 2;
                 ctx.shadowOffsetY = 2;
 
-                ctx.fillStyle='#f1c40f'; ctx.font='bold 28px 微軟正黑體'; ctx.textAlign='left'; ctx.fillText(`LV. ${level}`, 30, canvas.height-30);
+                ctx.fillStyle='#f1c40f'; ctx.font='bold 28px 微軟正黑體'; ctx.textAlign='left'; ctx.fillText(`LV. ${level}`, 20, 40);
 
                 let ls = Object.keys(skillData).filter(k=>skillData[k].isLearned).map(k=>skillData[k].name).join(', ');
                 ctx.fillStyle='#ecf0f1'; ctx.font='16px 微軟正黑體'; ctx.fillText(`已學: ${ls}`, 140, canvas.height-30);
