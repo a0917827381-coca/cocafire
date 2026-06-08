@@ -1695,6 +1695,11 @@
                 document.getElementById('leaderboardScreen').style.display = 'flex';
             });
         }
+        function gameLoop() { 
+            if (!isPaused && !hasWon) { update(); } 
+            draw(); 
+            requestAnimationFrame(gameLoop); 
+        }
         requestAnimationFrame(gameLoop);
     </script>
 </body>
