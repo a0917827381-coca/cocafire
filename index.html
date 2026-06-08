@@ -3,7 +3,9 @@
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta charset="UTF-8">
-    <title>台北市倖存者：萃比的咖啡防衛戰 (極速走位版)</title>
+    <title>竹北倖存者：萃比的咖啡防衛戰 (極速走位版)</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <style>
         body {
             margin: 0; overflow: hidden; background-color: #1a252c;
@@ -125,7 +127,20 @@
         </div>
         <button id="btnContinueInfo" onclick="resumeFromInfo()">繼續戰鬥</button>
     </div>
-    
+    <div id="winScreen" style="display:none; position:absolute; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.9); flex-direction:column; justify-content:center; align-items:center; z-index:200; color:white; font-family:'微軟正黑體'; text-align:center;">
+        <h1 style="color:#f1c40f; font-size:48px;">恭喜破關！</h1>
+        <p id="winStats" style="font-size:24px; line-height:1.5;"></p>
+        <p id="winScoreText" style="font-size:36px; color:#e74c3c; font-weight:bold; margin:20px 0;"></p>
+        <input type="text" id="playerName" placeholder="請輸入你的大名" style="font-size:24px; padding:10px; margin:20px; text-align:center; border-radius:10px; border:2px solid #f1c40f; background:rgba(255,255,255,0.1); color:white; width: 80%; max-width: 300px;">
+        <button id="btnSubmitScore" style="font-size:24px; padding:15px 40px; background:linear-gradient(135deg, #f1c40f 0%, #e67e22 100%); color:#fff; border:none; border-radius:50px; cursor:pointer; font-weight:bold; box-shadow: 0 5px 15px rgba(243, 156, 18, 0.4);">送出成績</button>
+    </div>
+
+    <div id="leaderboardScreen" style="display:none; position:absolute; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.95); flex-direction:column; justify-content:center; align-items:center; z-index:300; color:white; font-family:'微軟正黑體'; text-align:center; overflow-y:auto; padding:20px; box-sizing:border-box;">
+        <h1 style="color:#f1c40f; font-size:40px; margin-bottom:20px;">🏆 倖存者排行榜 🏆</h1>
+        <div id="leaderboardList" style="background:rgba(255,255,255,0.1); padding:20px; border-radius:15px; width:100%; max-width:400px; text-align:left; font-size:20px; line-height:2;"></div>
+        <div id="playerRankDisplay" style="margin-top:20px; font-size:24px; color:#e74c3c; font-weight:bold; background:rgba(231,76,60,0.2); padding:10px 20px; border-radius:10px;"></div>
+        <button onclick="location.reload()" style="margin-top:30px; font-size:20px; padding:10px 30px; background:#3498db; color:#fff; border:none; border-radius:10px; cursor:pointer;">再挑戰一次</button>
+    </div>
     <button id="btnFullscreen">全螢幕</button>
     <canvas id="gameCanvas"></canvas>
 
@@ -1137,7 +1152,8 @@
                     
                     if (e.isBoss) {
                         if (e.bossType === 7) {
-                            hasWon = true; 
+                            hasWon = true;
+                            triggerWinScreen(); // 加上這行來呼叫結算畫面！ 
                         } else {
                             score += 50; currentExp += 50 * expRate; if (level < 100) triggerInfoScreen('boss' + e.bossType);
                         }
@@ -1594,7 +1610,91 @@
             ctx.restore();
         }
 
-        function gameLoop() { if (!isPaused && !hasWon) { update(); } draw(); requestAnimationFrame(gameLoop); }
+        // ==========================================
+        // 1. 初始化 Firebase (請換成你的 Config)
+        // ==========================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyA5fSYk3HikkNzCPafnzwG9xhgijuXJI9g",
+            authDomain: "coca-survivor.firebaseapp.com",
+            databaseURL: "https://coca-survivor-default-rtdb.asia-southeast1.firebasedatabase.app", 
+            projectId: "coca-survivor",
+            storageBucket: "coca-survivor.firebasestorage.app",
+            messagingSenderId: "222225908258",
+            appId: "1:222225908258:web:810c1f2f967347494c807b"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        let finalCalculatedScore = 0;
+
+        // 結算分數並顯示畫面
+        function triggerWinScreen() {
+            if (document.getElementById('winScreen').style.display === 'flex') return;
+            let totalSecs = Math.floor(frameCount / 60);
+            let mins = Math.floor(totalSecs / 60); let secs = totalSecs % 60;
+            let score1 = Math.floor(player.hp) * (1 + player.revives);
+            let score2 = (20 - mins) * (60 - secs);
+            finalCalculatedScore = score1 + score2;
+            
+            document.getElementById('winStats').innerHTML = `通關時間：${mins} 分 ${secs} 秒<br>剩餘血量：${Math.floor(player.hp)} / 復活次數：${player.revives}`;
+            document.getElementById('winScoreText').innerText = `最終總分：${finalCalculatedScore}`;
+            document.getElementById('winScreen').style.display = 'flex';
+        }
+
+        // ==========================================
+        // 2. 將成績「寫入」Firebase 雲端
+        // ==========================================
+        document.getElementById('btnSubmitScore').addEventListener('click', () => {
+            let name = document.getElementById('playerName').value.trim();
+            if (!name) name = "無名萃粉";
+
+            const scoreData = {
+                name: name,
+                score: finalCalculatedScore,
+                time: firebase.database.ServerValue.TIMESTAMP
+            };
+            
+            document.getElementById('btnSubmitScore').disabled = true;
+            document.getElementById('btnSubmitScore').innerText = "上傳中...";
+
+            database.ref('leaderboard').push(scoreData).then(() => {
+                fetchAndShowLeaderboard(name, finalCalculatedScore);
+            }).catch((error) => {
+                alert("上傳失敗，請檢查網路連線！");
+            });
+        });
+
+        // ==========================================
+        // 3. 從 Firebase 雲端「讀取」排行榜
+        // ==========================================
+        function fetchAndShowLeaderboard(playerName, playerScore) {
+            document.getElementById('winScreen').style.display = 'none';
+            
+            database.ref('leaderboard').orderByChild('score').limitToLast(10).once('value', (snapshot) => {
+                let lb = [];
+                snapshot.forEach((childSnapshot) => { lb.push(childSnapshot.val()); });
+                lb.reverse(); // Firebase 是從小到大，我們反轉成大到小
+
+                let html = "";
+                let playerRank = -1; 
+
+                for (let i = 0; i < lb.length; i++) {
+                    let medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : ` <span style="display:inline-block;width:25px;text-align:center;">${i+1}.</span> `;
+                    let isMe = (lb[i].name === playerName && lb[i].score === playerScore) ? "color:#f1c40f; font-weight:bold;" : "";
+                    html += `<div style="${isMe}; display:flex; justify-content:space-between; border-bottom:1px solid rgba(255,255,255,0.1); padding:5px 0;"><span>${medal} ${lb[i].name}</span> <span>${lb[i].score} 分</span></div>`;
+                    
+                    if (lb[i].name === playerName && lb[i].score === playerScore) playerRank = i + 1;
+                }
+                
+                document.getElementById('leaderboardList').innerHTML = html;
+                if (playerRank === -1) {
+                    document.getElementById('playerRankDisplay').innerText = `你的分數：${playerScore} 分 (未進入前 10 名)`;
+                } else {
+                    document.getElementById('playerRankDisplay').innerText = `🎉 恭喜名列前茅！(第 ${playerRank} 名)`;
+                }
+                document.getElementById('leaderboardScreen').style.display = 'flex';
+            });
+        }
         requestAnimationFrame(gameLoop);
     </script>
 </body>
