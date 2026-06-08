@@ -1112,7 +1112,7 @@
                         }
                     } else {
                         e.attackTimer++;
-                        if (e.bossType === 1) { if (getDistance(e.x, e.y, player.x, player.y) < (isB ? 240 : 120)) { if (frameCount % 30 === 0) takeDamage(isB ? 100 : 25); } } 
+                        if (e.bossType === 1) { if (getDistance(e.x, e.y, player.x, player.y) < (isB ? 180 : 90)) { if (frameCount % 30 === 0) takeDamage(isB ? 100 : 25); } } 
                         else if (e.bossType === 2) {
                             if (e.attackTimer >= 180) {
                                 e.attackTimer = 0; let bulletCount = isB ? 12 : 6;
