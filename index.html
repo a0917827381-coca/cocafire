@@ -1167,7 +1167,7 @@
                     if (e.isBoss) {
                         if (e.bossType === 7) {
                             hasWon = true;
-                            triggerWinScreen(true); // 加上這行來呼叫結算畫面！ 
+                            triggerEndScreen(true); // 加上這行來呼叫結算畫面！ 
                         } else {
                             score += 50; currentExp += 50 * expRate; if (level < 100) triggerInfoScreen('boss' + e.bossType);
                         }
