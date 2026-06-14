@@ -501,7 +501,11 @@
         }
 
         function update() {
-            if (player.hp <= 0 || isPaused || hasWon) return;
+            if (player.hp <= 0) {
+                triggerEndScreen(false); // 觸發死亡結算
+                return;
+            }
+            if (isPaused || hasWon) return;
 
             // 動態血量倍率：前期溫和、中期追趕爆發、後期平穩。確保大絕能清小怪，但王擁有破百億血量無法被秒殺
             let hpMultiplier = 1;
@@ -1163,7 +1167,7 @@
                     if (e.isBoss) {
                         if (e.bossType === 7) {
                             hasWon = true;
-                            triggerWinScreen(); // 加上這行來呼叫結算畫面！ 
+                            triggerWinScreen(true); // 加上這行來呼叫結算畫面！ 
                         } else {
                             score += 50; currentExp += 50 * expRate; if (level < 100) triggerInfoScreen('boss' + e.bossType);
                         }
@@ -1640,23 +1644,39 @@
         const database = firebase.database();
 
         let finalCalculatedScore = 0;
+        let finalSurvivalTimeStr = ""; // 新增：用來儲存格式化後的存活時間
 
-        // 結算分數並顯示畫面
-        function triggerWinScreen() {
+        // === 1. 統一的結算畫面 (破關或死亡都呼叫此函式) ===
+        function triggerEndScreen(isVictory) {
             if (document.getElementById('winScreen').style.display === 'flex') return;
-            let totalSecs = Math.floor(frameCount / 60);
-            let mins = Math.floor(totalSecs / 60); let secs = totalSecs % 60;
-            let score1 = Math.floor(player.hp) * (1 + player.revives);
-            let score2 = (20 - mins) * (60 - secs);
-            finalCalculatedScore = score1 + score2;
+            isPaused = true; // 確保遊戲暫停
             
-            document.getElementById('winStats').innerHTML = `通關時間：${mins} 分 ${secs} 秒<br>剩餘血量：${Math.floor(player.hp)} / 復活次數：${player.revives}`;
+            let totalSecs = Math.floor(frameCount / 60);
+            let mins = Math.floor(totalSecs / 60); 
+            let secs = totalSecs % 60;
+            finalSurvivalTimeStr = `${mins}分${secs}秒`; // 記錄字串準備傳給 Firebase
+            
+            // 分數計算邏輯：打贏給大幅加成，死亡純算擊殺與存活
+            let score1 = isVictory ? Math.floor(player.hp) * (1 + player.revives) : 0;
+            let score2 = isVictory ? (20 - mins) * (60 - secs) : (mins * 60 + secs) * 10;
+            finalCalculatedScore = score + score1 + score2; // 把擊殺數(score)也算進去
+            
+            // 動態修改標題
+            document.querySelector('#winScreen h1').innerText = isVictory ? "恭喜破關！" : "當日營業結束";
+            document.querySelector('#winScreen h1').style.color = isVictory ? "#f1c40f" : "#e74c3c";
+            
+            document.getElementById('winStats').innerHTML = `存活時間：${finalSurvivalTimeStr}<br>達到等級：LV.${level} / 總擊殺數：${score}`;
             document.getElementById('winScoreText').innerText = `最終總分：${finalCalculatedScore}`;
             document.getElementById('winScreen').style.display = 'flex';
         }
 
+        // 修改 update() 中的死亡邏輯，呼叫結算畫面
+        // 🚨 注意：請確保在原來的 update() 函式最上方，將 player.hp <= 0 的判斷改為：
+        // if (player.hp <= 0 && document.getElementById('winScreen').style.display !== 'flex') { triggerEndScreen(false); return; }
+        // if (isPaused || hasWon) return;
+
         // ==========================================
-        // 2. 將成績「寫入」Firebase 雲端
+        // 2. 將成績「寫入」Firebase 雲端 (加入存活時間)
         // ==========================================
         document.getElementById('btnSubmitScore').addEventListener('click', () => {
             let name = document.getElementById('playerName').value.trim();
@@ -1665,7 +1685,8 @@
             const scoreData = {
                 name: name,
                 score: finalCalculatedScore,
-                time: firebase.database.ServerValue.TIMESTAMP
+                survivalTime: finalSurvivalTimeStr, // 將遊戲時間傳上雲端
+                timestamp: firebase.database.ServerValue.TIMESTAMP // 留著做排序或除錯用
             };
             
             document.getElementById('btnSubmitScore').disabled = true;
@@ -1675,11 +1696,13 @@
                 fetchAndShowLeaderboard(name, finalCalculatedScore);
             }).catch((error) => {
                 alert("上傳失敗，請檢查網路連線！");
+                document.getElementById('btnSubmitScore').disabled = false;
+                document.getElementById('btnSubmitScore').innerText = "送出成績";
             });
         });
 
         // ==========================================
-        // 3. 從 Firebase 雲端「讀取」排行榜
+        // 3. 從 Firebase 雲端「讀取」排行榜 (顯示時間)
         // ==========================================
         function fetchAndShowLeaderboard(playerName, playerScore) {
             document.getElementById('winScreen').style.display = 'none';
@@ -1695,7 +1718,30 @@
                 for (let i = 0; i < lb.length; i++) {
                     let medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : ` <span style="display:inline-block;width:25px;text-align:center;">${i+1}.</span> `;
                     let isMe = (lb[i].name === playerName && lb[i].score === playerScore) ? "color:#f1c40f; font-weight:bold;" : "";
-                    html += `<div style="${isMe}; display:flex; justify-content:space-between; border-bottom:1px solid rgba(255,255,255,0.1); padding:5px 0;"><span>${medal} ${lb[i].name}</span> <span>${lb[i].score} 分</span></div>`;
+                    
+                    let sTime = lb[i].survivalTime ? lb[i].survivalTime : "未知";
+                    
+                    // 新增：轉換 Firebase 的時間戳記為現實日期格式 (MM/DD HH:mm)
+                    let realDateStr = "";
+                    if (lb[i].timestamp) {
+                        let d = new Date(lb[i].timestamp);
+                        let mm = String(d.getMonth() + 1).padStart(2, '0');
+                        let dd = String(d.getDate()).padStart(2, '0');
+                        let hh = String(d.getHours()).padStart(2, '0');
+                        let min = String(d.getMinutes()).padStart(2, '0');
+                        realDateStr = `${mm}/${dd} ${hh}:${min}`; 
+                    }
+
+                    // 修改 HTML 結構，把存活時間跟現實時間放在名字下方的小字
+                    html += `<div style="${isMe}; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.1); padding:8px 0;">
+                                <div style="display:flex; flex-direction:column;">
+                                    <span style="font-size:18px;">${medal} ${lb[i].name}</span>
+                                    <span style="font-size:12px; color:#95a5a6; margin-left:30px; margin-top:4px;">
+                                        🎮 ${sTime} | 📅 ${realDateStr}
+                                    </span>
+                                </div>
+                                <span style="font-size:20px;">${lb[i].score} 分</span>
+                             </div>`;
                     
                     if (lb[i].name === playerName && lb[i].score === playerScore) playerRank = i + 1;
                 }
@@ -1709,8 +1755,9 @@
                 document.getElementById('leaderboardScreen').style.display = 'flex';
             });
         }
+
         function gameLoop() { 
-            if (!isPaused && !hasWon) { update(); } 
+            if (!isPaused && !hasWon && player.hp > 0) { update(); } 
             draw(); 
             requestAnimationFrame(gameLoop); 
         }
