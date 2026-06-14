@@ -1308,7 +1308,7 @@
             });
 
             enemies.forEach(e => {
-                if (e.isBoss && e.bossType === 1) { ctx.beginPath(); ctx.arc(e.x, e.y, 300, 0, Math.PI * 2); ctx.fillStyle = 'rgba(231, 76, 60, 0.2)'; ctx.fill(); ctx.strokeStyle = 'rgba(231, 76, 60, 0.8)'; ctx.lineWidth = 4; ctx.stroke(); }
+                if (e.isBoss && e.bossType === 1) { ctx.beginPath(); ctx.arc(e.x, e.y, 180, 0, Math.PI * 2); ctx.fillStyle = 'rgba(231, 76, 60, 0.2)'; ctx.fill(); ctx.strokeStyle = 'rgba(231, 76, 60, 0.8)'; ctx.lineWidth = 4; ctx.stroke(); }
             });
 
             if (player.hasBoss1Skill) {
@@ -1394,19 +1394,29 @@
                 ctx.fillStyle = bb.type === 'mimicArrow' ? '#9b59b6' : '#2ecc71'; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
             });
 
+            // === 修正後的子彈高效能渲染區塊 ===
             bullets.forEach(b => {
                 if (b.type === 'aeropress' || b.type === 'stolen2') return;
-                ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.angle + Math.PI/2); let w=b.radius*1.5; let h=b.radius*2;
-                if (b.type==='americano') {
+                
+                // 1. 拿鐵與冰滴是圓形，不需要旋轉，直接用絕對座標繪製，效能提升數十倍
+                if (b.type === 'latte') {
+                    ctx.fillStyle='#f3e5ab'; ctx.beginPath(); ctx.arc(b.x, b.y, b.radius, 0, Math.PI*2); ctx.fill(); 
+                    ctx.strokeStyle='#c89e72'; ctx.lineWidth=4; ctx.stroke();
+                    ctx.beginPath(); ctx.arc(b.x + b.radius, b.y, 8, -Math.PI/2, Math.PI/2); ctx.stroke();
+                } 
+                else if (b.type === 'coldBrew' && b.fall) {
+                    // 冰滴碎冰也是正方形，不需要旋轉變換
+                    ctx.fillStyle='rgba(173, 216, 230, 0.8)'; ctx.fillRect(b.x - b.radius, b.y - b.radius, b.radius*2, b.radius*2);
+                    ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.strokeRect(b.x - b.radius, b.y - b.radius, b.radius*2, b.radius*2);
+                }
+                // 2. 只有需要旋轉的美式咖啡，才啟動 save/restore 矩陣變換
+                else if (b.type === 'americano') {
+                    ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.angle + Math.PI/2); let w=b.radius*1.5; let h=b.radius*2;
                     ctx.fillStyle='#f5f5f5'; ctx.beginPath(); ctx.moveTo(-w/2,-h/2); ctx.lineTo(w/2,-h/2); ctx.lineTo(w/2*0.7,h/2); ctx.lineTo(-w/2*0.7,h/2); ctx.fill();
                     ctx.fillStyle='#c89e72'; ctx.beginPath(); ctx.moveTo(-w/2*0.85,-h/8); ctx.lineTo(w/2*0.85,-h/8); ctx.lineTo(w/2*0.75,h/4); ctx.lineTo(-w/2*0.75,h/4); ctx.fill();
                     ctx.fillStyle='#222'; ctx.beginPath(); ctx.ellipse(0,-h/2,w/2+2,4,0,0,Math.PI*2); ctx.fill();
-                } else if (b.type==='latte') {
-                    ctx.fillStyle='#f3e5ab'; ctx.beginPath(); ctx.arc(0,0,b.radius,0,Math.PI*2); ctx.fill(); ctx.strokeStyle='#c89e72'; ctx.lineWidth=4; ctx.stroke();
-                    ctx.beginPath(); ctx.arc(b.radius,0,8,-Math.PI/2,Math.PI/2); ctx.stroke();
-                } else if (b.type==='coldBrew' && b.fall) {
-                    ctx.fillStyle='rgba(173, 216, 230, 0.8)'; ctx.fillRect(-b.radius,-b.radius,b.radius*2,b.radius*2); ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.strokeRect(-b.radius,-b.radius,b.radius*2,b.radius*2);
-                } ctx.restore();
+                    ctx.restore();
+                }
             });
 
             if (bullets.some(b => b.type === 'aeropress')) {
@@ -1466,17 +1476,31 @@
                 if (e.type === 'emoji') {
                     ctx.font='60px Arial'; ctx.fillText(e.emoji, e.x, e.y);
                 } else {
-                    if (e.img && e.img.complete && e.img.naturalHeight !== 0) {
-                        const ar = e.img.naturalWidth / e.img.naturalHeight;
-                        let drawWidth = 50;
-                        if (e.isBoss) {
-                            drawWidth = 120;
-                        } else if (e.isMiniBoss && e.bossType === 5) {
-                            drawWidth = 25;
+                    // =======================================================
+                    // 👇 新的高效能優化區塊：記憶化寬高 (Lazy Caching)
+                    // =======================================================
+                    
+                    // 1. 如果這隻怪物的物件上還沒有 e.dw (繪製寬度)，代表它是剛出生的新怪
+                    if (!e.dw) {
+                        if (e.img && e.img.complete && e.img.naturalHeight !== 0) {
+                            const ar = e.img.naturalWidth / e.img.naturalHeight;
+                            
+                            // 根據怪物類型決定基礎寬度
+                            e.dw = e.isBoss ? 120 : (e.isMiniBoss && e.bossType === 5 ? 25 : 50);
+                            // 算出高度後，直接綁定在該怪物物件上
+                            e.dh = e.dw / ar; 
+                        } else {
+                            // 預防圖片尚未載入完成的極端狀況，先給 0，下一幀會重新進來計算
+                            e.dw = 0;
+                            e.dh = 0;
                         }
-                        const drawHeight = drawWidth / ar;
-                        ctx.drawImage(e.img, e.x - drawWidth/2, e.y - drawHeight/2, drawWidth, drawHeight);
                     }
+
+                    // 2. 只要 e.dw 計算過且大於 0，後續的幾千幀都直接讀取屬性，完全不做任何除法與 DOM 查詢
+                    if (e.dw > 0) {
+                        ctx.drawImage(e.img, e.x - e.dw/2, e.y - e.dh/2, e.dw, e.dh);
+                    }
+                    // =======================================================
                 }
 
                 if (e.hp < e.maxHp && !e.hideHpBar && !e.isEntering) {
@@ -1505,8 +1529,16 @@
             bossEnemies.forEach(renderEnemy);
 
             ctx.font='bold 24px Arial'; ctx.textAlign='center';
-            damageNumbers.forEach(d => { ctx.lineWidth=3; ctx.strokeStyle='#000'; ctx.strokeText(d.text, d.x, d.y); ctx.fillStyle=d.color; ctx.fillText(d.text, d.x, d.y); });
-
+            // === 優化後：只設定一次狀態，迴圈內純噴射字體 ===
+            ctx.font='bold 24px Arial'; ctx.textAlign='center';
+            ctx.lineWidth = 3; 
+            ctx.strokeStyle = '#000'; // 提至迴圈外
+            
+            damageNumbers.forEach(d => { 
+                ctx.strokeText(d.text, d.x, d.y); 
+                ctx.fillStyle=d.color; 
+                ctx.fillText(d.text, d.x, d.y); 
+            });
             const hw=300; const hh=24; const hx=canvas.width-hw-30; const hy=canvas.height-42;
 
             // === 優化 5：整個網頁頂、底層 UI 完全改為手動雙繪製「實邊偽陰影」，完全割除高斯模糊 ===
