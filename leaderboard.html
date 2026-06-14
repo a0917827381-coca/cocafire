@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta charset="UTF-8">
+    <title>COCA 倖存者 - 店長專屬戰況觀測站</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <style>
+        body {
+            margin: 0; background-color: #1a252c; color: white;
+            font-family: '微軟正黑體', sans-serif;
+            display: flex; flex-direction: column; align-items: center;
+            padding: 20px;
+        }
+        h1 { color: #f1c40f; font-size: 32px; text-align: center; margin-bottom: 5px; }
+        .subtitle { color: #95a5a6; font-size: 14px; margin-bottom: 20px; }
+        #leaderboardList {
+            background: rgba(255, 255, 255, 0.05); padding: 20px;
+            border-radius: 15px; width: 100%; max-width: 500px;
+            box-sizing: border-box;
+        }
+        .rank-item {
+            display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1); padding: 12px 0;
+        }
+        .rank-item:last-child { border-bottom: none; }
+        .player-info { display: flex; flex-direction: column; }
+        .player-name { font-size: 20px; font-weight: bold; }
+        .player-details { font-size: 13px; color: #bdc3c7; margin-top: 5px; }
+        .player-score { font-size: 24px; color: #e74c3c; font-weight: bold; }
+        .btn-refresh {
+            margin-top: 20px; font-size: 18px; padding: 12px 30px;
+            background: #3498db; color: #fff; border: none; border-radius: 10px;
+            cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🏆 現場戰力排行榜</h1>
+    <div class="subtitle">自動抓取前 30 名倖存者數據</div>
+
+    <div id="leaderboardList">資料載入中，請稍候...</div>
+
+    <button class="btn-refresh" onclick="location.reload()">🔄 更新最新戰況</button>
+
+    <script>
+        // 初始化 Firebase (使用你的 Config)
+        const firebaseConfig = {
+            apiKey: "AIzaSyA5fSYk3HikkNzCPafnzwG9xhgijuXJI9g",
+            authDomain: "coca-survivor.firebaseapp.com",
+            databaseURL: "https://coca-survivor-default-rtdb.asia-southeast1.firebasedatabase.app", 
+            projectId: "coca-survivor",
+            storageBucket: "coca-survivor.firebasestorage.app",
+            messagingSenderId: "222225908258",
+            appId: "1:222225908258:web:810c1f2f967347494c807b"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        // 讀取排行榜 (抓取前 30 名)
+        database.ref('leaderboard').orderByChild('score').limitToLast(30).once('value', (snapshot) => {
+            let lb = [];
+            snapshot.forEach((childSnapshot) => { lb.push(childSnapshot.val()); });
+            lb.reverse(); // 分數從大排到小
+
+            let html = "";
+            for (let i = 0; i < lb.length; i++) {
+                let medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `<span style="display:inline-block;width:25px;text-align:center;color:#7f8c8d;">${i+1}.</span>`;
+                let sTime = lb[i].survivalTime ? lb[i].survivalTime : "未知";
+                
+                // 時間格式化
+                let realDateStr = "";
+                if (lb[i].timestamp) {
+                    let d = new Date(lb[i].timestamp);
+                    let mm = String(d.getMonth() + 1).padStart(2, '0');
+                    let dd = String(d.getDate()).padStart(2, '0');
+                    let hh = String(d.getHours()).padStart(2, '0');
+                    let min = String(d.getMinutes()).padStart(2, '0');
+                    realDateStr = `${mm}/${dd} ${hh}:${min}`; 
+                }
+
+                html += `
+                <div class="rank-item">
+                    <div class="player-info">
+                        <span class="player-name">${medal} ${lb[i].name}</span>
+                        <span class="player-details">⏱️ ${sTime} | 📅 ${realDateStr}</span>
+                    </div>
+                    <span class="player-score">${lb[i].score}</span>
+                </div>`;
+            }
+            
+            if (html === "") html = "<div style='text-align:center; color:#95a5a6;'>目前還沒有人挑戰喔！</div>";
+            document.getElementById('leaderboardList').innerHTML = html;
+        }).catch((error) => {
+            document.getElementById('leaderboardList').innerHTML = "<div style='color:#e74c3c; text-align:center;'>讀取失敗，請檢查網路連線。</div>";
+        });
+    </script>
+</body>
+</html>
