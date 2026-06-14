@@ -1250,11 +1250,6 @@
 
             drawGrid();
 
-            if (controlsInverted > 0) {
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-                if (frameCount % 3 === 0) { ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'; ctx.font = '20px monospace'; for (let i=0; i<15; i++) ctx.fillText(Math.random().toString(36).substring(2), Math.random()*canvas.width, Math.random()*canvas.height); }
-            }
-
             enemies.forEach(e => {
                 if (e.isBoss && e.bossType === 4) {
                     ctx.beginPath(); ctx.arc(e.x, e.y, 400, 0, Math.PI * 2);
@@ -1285,32 +1280,52 @@
                 ctx.beginPath(); ctx.arc(sl.x, sl.y, sl.radius * (sl.timer / 90), 0, Math.PI * 2); ctx.fillStyle = 'rgba(231, 76, 60, 0.5)'; ctx.fill();
             });
 
+            // === 優化 1：X-Rays 死光發光效果改為多層矩陣繪製 ===
             xRays.forEach(xr => {
                 ctx.save(); ctx.translate(player.x, player.y); let alpha = xr.timer / 60;
                 if (xr.isRedK) {
-                    ctx.fillStyle = `rgba(231, 76, 60, ${alpha * 0.8})`; ctx.shadowBlur = 20; ctx.shadowColor = '#e74c3c';
+                    // 外層大範圍淡色光圈
+                    ctx.fillStyle = `rgba(231, 76, 60, ${alpha * 0.25})`;
+                    ctx.fillRect(-canvas.width * 2, -90, canvas.width * 4, 180); ctx.fillRect(-90, -canvas.width * 2, 180, canvas.width * 4);
+                    // 中層飽和能量層
+                    ctx.fillStyle = `rgba(231, 76, 60, ${alpha * 0.8})`;
                     ctx.fillRect(-canvas.width * 2, -60, canvas.width * 4, 120); ctx.fillRect(-60, -canvas.width * 2, 120, canvas.width * 4);
-                    ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`; ctx.fillRect(-canvas.width * 2, -20, canvas.width * 4, 40); ctx.fillRect(-20, -canvas.width * 2, 40, canvas.width * 4);
+                    // 內層高亮核心
+                    ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`; 
+                    ctx.fillRect(-canvas.width * 2, -20, canvas.width * 4, 40); ctx.fillRect(-20, -canvas.width * 2, 40, canvas.width * 4);
                 } else {
-                    ctx.rotate(Math.PI / 4); ctx.fillStyle = `rgba(0, 255, 255, ${alpha * 0.8})`; ctx.shadowBlur = 20; ctx.shadowColor = '#0ff';
+                    ctx.rotate(Math.PI / 4);
+                    // 外層淡藍光圈
+                    ctx.fillStyle = `rgba(0, 255, 255, ${alpha * 0.25})`;
+                    ctx.fillRect(-canvas.width * 2, -80, canvas.width * 4, 160); ctx.fillRect(-80, -canvas.width * 2, 160, canvas.width * 4);
+                    // 中層算力晶片能量
+                    ctx.fillStyle = `rgba(0, 255, 255, ${alpha * 0.8})`;
                     ctx.fillRect(-canvas.width * 2, -50, canvas.width * 4, 100); ctx.fillRect(-50, -canvas.width * 2, 100, canvas.width * 4);
-                    ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`; ctx.fillRect(-canvas.width * 2, -20, canvas.width * 4, 40); ctx.fillRect(-20, -canvas.width * 2, 40, canvas.width * 4);
+                    // 內層核心
+                    ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`; 
+                    ctx.fillRect(-canvas.width * 2, -15, canvas.width * 4, 30); ctx.fillRect(-15, -canvas.width * 2, 30, canvas.width * 4);
                 } ctx.restore();
             });
 
             enemies.forEach(e => {
-                if (e.isBoss && e.bossType === 1) { ctx.beginPath(); ctx.arc(e.x, e.y, 180, 0, Math.PI * 2); ctx.fillStyle = 'rgba(231, 76, 60, 0.2)'; ctx.fill(); ctx.strokeStyle = 'rgba(231, 76, 60, 0.8)'; ctx.lineWidth = 4; ctx.stroke(); }
+                if (e.isBoss && e.bossType === 1) { ctx.beginPath(); ctx.arc(e.x, e.y, 300, 0, Math.PI * 2); ctx.fillStyle = 'rgba(231, 76, 60, 0.2)'; ctx.fill(); ctx.strokeStyle = 'rgba(231, 76, 60, 0.8)'; ctx.lineWidth = 4; ctx.stroke(); }
             });
 
             if (player.hasBoss1Skill) {
                 ctx.beginPath(); ctx.arc(player.x, player.y, 200, 0, Math.PI * 2); ctx.fillStyle = 'rgba(241, 196, 15, 0.15)'; ctx.fill(); ctx.strokeStyle = 'rgba(243, 156, 18, 0.7)'; ctx.lineWidth = 3; ctx.stroke();
             }
 
+            // === 優化 2：黑洞霓虹外環改為多重實線疊加 ===
             blackHoles.forEach(bh => {
                 ctx.save(); ctx.translate(bh.x, bh.y); ctx.rotate(frameCount * 0.1);
                 let color = bh.isPlayer ? '142, 68, 173' : '52, 152, 219'; 
                 ctx.beginPath(); ctx.arc(0, 0, 50, 0, Math.PI*2); ctx.fillStyle = '#000'; ctx.fill();
-                ctx.shadowBlur = 30; ctx.shadowColor = `rgb(${color})`; ctx.strokeStyle = `rgba(${color}, 0.8)`; ctx.lineWidth = 8; ctx.stroke();
+                
+                // 寬度較寬的淡色外環模擬光暈
+                ctx.strokeStyle = `rgba(${color}, 0.25)`; ctx.lineWidth = 24; ctx.stroke();
+                // 核心鮮豔實線
+                ctx.strokeStyle = `rgba(${color}, 0.8)`; ctx.lineWidth = 8; ctx.stroke();
+                
                 for(let i=0; i<8; i++) {
                     ctx.beginPath(); ctx.arc(0, 0, 50 + (frameCount*2 + i*20)%100, (Math.PI*2/8)*i, (Math.PI*2/8)*(i+0.5));
                     ctx.strokeStyle = `rgba(${color}, 0.4)`; ctx.lineWidth = 4; ctx.stroke();
@@ -1351,6 +1366,7 @@
                 ctx.fillStyle = '#fff'; ctx.font = 'bold 14px Arial'; ctx.fillText(Math.ceil(c.timer/60), c.x, c.y-c.radius-10);
             });
 
+            // === 優化 3：魔法光砲 (Zoltraak) 改用包覆式實色色塊顯像 ===
             zoltraaks.forEach(z => {
                 ctx.save(); ctx.translate(z.x, z.y); ctx.rotate(z.angle);
                 if (!z.isPlayer) {
@@ -1358,12 +1374,18 @@
                         ctx.strokeStyle = z.isPurple ? 'rgba(142, 68, 173, 0.5)' : 'rgba(231, 76, 60, 0.5)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(2000, 0); ctx.stroke();
                         ctx.beginPath(); ctx.arc(0, 0, 50 + Math.random()*20, 0, Math.PI*2); ctx.strokeStyle = z.isPurple ? 'rgba(155, 89, 182, 0.8)' : 'rgba(142, 68, 173, 0.8)'; ctx.lineWidth = 5; ctx.stroke();
                     } else {
-                        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'; ctx.shadowBlur = 30; ctx.shadowColor = z.isPurple ? '#9b59b6' : '#8e44ad'; ctx.fillRect(0, -60, 2000, 120);
-                        ctx.fillStyle = z.isPurple ? 'rgba(142, 68, 173, 0.8)' : 'rgba(142, 68, 173, 0.6)'; ctx.fillRect(0, -80, 2000, 160);
+                        // 外層半透明魔法光暈
+                        ctx.fillStyle = z.isPurple ? 'rgba(155, 89, 182, 0.3)' : 'rgba(142, 68, 173, 0.3)'; ctx.fillRect(0, -90, 2000, 180);
+                        // 中層核心光束
+                        ctx.fillStyle = z.isPurple ? 'rgba(142, 68, 173, 0.9)' : 'rgba(142, 68, 173, 0.7)'; ctx.fillRect(0, -80, 2000, 160);
+                        // 內層破壞白光
+                        ctx.fillStyle = 'rgba(255, 255, 255, 0.95)'; ctx.fillRect(0, -40, 2000, 80);
                     }
                 } else {
-                    let alpha = z.timer / 60; ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`; ctx.shadowBlur = 30; ctx.shadowColor = '#f1c40f';
-                    ctx.fillRect(0, -40, 2000, 80); ctx.fillStyle = `rgba(241, 196, 15, ${alpha * 0.6})`; ctx.fillRect(0, -60, 2000, 120);
+                    let alpha = z.timer / 60;
+                    ctx.fillStyle = `rgba(241, 196, 15, ${alpha * 0.25})`; ctx.fillRect(0, -90, 2000, 180);
+                    ctx.fillStyle = `rgba(241, 196, 15, ${alpha * 0.7})`; ctx.fillRect(0, -70, 2000, 140);
+                    ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`; ctx.fillRect(0, -35, 2000, 70);
                 } ctx.restore();
             });
 
@@ -1411,10 +1433,12 @@
                 let cups = 5; let radius = 110;
                 for(let i=0; i<cups; i++) {
                     let a = player.starRingAngle + (Math.PI * 2 / cups) * i; let cx = player.x + Math.cos(a) * radius; let cy = player.y + Math.sin(a) * radius;
-                    ctx.save(); ctx.translate(cx, cy); ctx.rotate(a + Math.PI/2); 
+                    ctx.save(); ctx.translate(cx, cy); ctx.rotate(a + Math.PI/2);
                     ctx.fillStyle = '#d35400'; ctx.beginPath(); ctx.moveTo(-20, -15); ctx.lineTo(20, -15); ctx.lineTo(15, 20); ctx.lineTo(-15, 20); ctx.fill();
-                    ctx.fillStyle = '#f1c40f'; ctx.shadowBlur = 30; ctx.shadowColor = '#e74c3c'; 
-                    ctx.beginPath(); ctx.moveTo(-15, -15); ctx.lineTo(15, -15); ctx.lineTo(10, 15); ctx.lineTo(-10, 15); ctx.fill();
+                    
+                    // === 優化 4：星環旋轉濾杯改用雙層硬色描邊，做出卡通渲染質感 ===
+                    ctx.fillStyle = '#c0392b'; ctx.beginPath(); ctx.moveTo(-17, -15); ctx.lineTo(17, -15); ctx.lineTo(12, 17); ctx.lineTo(-12, 17); ctx.fill();
+                    ctx.fillStyle = '#f1c40f'; ctx.beginPath(); ctx.moveTo(-14, -15); ctx.lineTo(14, -15); ctx.lineTo(9, 14); ctx.lineTo(-9, 14); ctx.fill();
                     ctx.restore();
                 }
             }
@@ -1443,22 +1467,18 @@
                     ctx.font='60px Arial'; ctx.fillText(e.emoji, e.x, e.y);
                 } else {
                     if (e.img && e.img.complete && e.img.naturalHeight !== 0) {
-                        const ar = e.img.naturalWidth / e.img.naturalHeight; 
-                        let drawWidth = 50; // 一般小怪視覺寬度
-                        
-                        // 萃比的視覺寬度是 80，王的視覺寬度 1.5 倍直接鎖定在 120
+                        const ar = e.img.naturalWidth / e.img.naturalHeight;
+                        let drawWidth = 50;
                         if (e.isBoss) {
-                            drawWidth = 120; 
+                            drawWidth = 120;
                         } else if (e.isMiniBoss && e.bossType === 5) {
                             drawWidth = 25;
                         }
-                        
                         const drawHeight = drawWidth / ar;
-                        // 移除結尾的 *0.5，直接用計算好的寬高繪製
                         ctx.drawImage(e.img, e.x - drawWidth/2, e.y - drawHeight/2, drawWidth, drawHeight);
                     }
                 }
-                
+
                 if (e.hp < e.maxHp && !e.hideHpBar && !e.isEntering) {
                     if (e.isBoss) {
                         const bw = 150; const bh = 10;
@@ -1489,97 +1509,119 @@
 
             const hw=300; const hh=24; const hx=canvas.width-hw-30; const hy=canvas.height-42;
 
+            // === 優化 5：整個網頁頂、底層 UI 完全改為手動雙繪製「實邊偽陰影」，完全割除高斯模糊 ===
             if (isUIHidden <= 0) {
-                // 為透明背景加上文字陰影，確保在各種背景下都看得清楚
                 ctx.save();
-                ctx.shadowColor = 'rgba(0,0,0,0.8)';
-                ctx.shadowBlur = 5;
-                ctx.shadowOffsetX = 2;
-                ctx.shadowOffsetY = 2;
+                ctx.textBaseline = 'middle';
 
-                ctx.fillStyle='#f1c40f'; ctx.font='bold 28px 微軟正黑體'; ctx.textAlign='left'; ctx.fillText(`LV. ${level}`, 20, 40);
+                // LV. 等級顯示 (左上角)
+                ctx.font='bold 28px 微軟正黑體'; ctx.textAlign='left';
+                ctx.fillStyle='rgba(0, 0, 0, 0.8)'; ctx.fillText(`LV. ${level}`, 22, 42); // 陰影層
+                ctx.fillStyle='#f1c40f'; ctx.fillText(`LV. ${level}`, 20, 40);             // 實體層
 
+                // 已學技能列表 (底部)
                 let ls = Object.keys(skillData).filter(k=>skillData[k].isLearned).map(k=>skillData[k].name).join(', ');
-                ctx.fillStyle='#ecf0f1'; ctx.font='16px 微軟正黑體'; ctx.fillText(`已學: ${ls}`, 140, canvas.height-30);
+                ctx.font='16px 微軟正黑體';
+                ctx.fillStyle='rgba(0, 0, 0, 0.8)'; ctx.fillText(`已學: ${ls}`, 142, canvas.height-28);
+                ctx.fillStyle='#ecf0f1'; ctx.fillText(`學: ${ls}`, 140, canvas.height-30);
 
-                // --- 存活時間顯示 ---
+                // ⏱️ 存活時間
                 let totalSecs = Math.floor(frameCount / 60);
                 let m = Math.floor(totalSecs / 60).toString().padStart(2, '0');
                 let s = (totalSecs % 60).toString().padStart(2, '0');
-                ctx.fillStyle = '#ecf0f1'; ctx.font = 'bold 18px 微軟正黑體'; ctx.textAlign = 'right';
-                ctx.fillText(`⏱️ 存活時間: ${m}:${s}`, hx + hw, hy - 10);
+                ctx.font = 'bold 18px 微軟正黑體'; ctx.textAlign = 'right';
+                ctx.fillStyle='rgba(0, 0, 0, 0.8)'; ctx.fillText(`⏱️ 存活時間: ${m}:${s}`, hx + hw + 2, hy - 8);
+                ctx.fillStyle = '#ecf0f1'; ctx.fillText(`⏱️ 存活時間: ${m}:${s}`, hx + hw, hy - 10);
 
-                // 復活次數顯示
+                // 👼 復活次數
                 if (player.revives > 0) {
-                    ctx.fillStyle = '#f1c40f'; ctx.font = 'bold 18px 微軟正黑體'; ctx.textAlign = 'left';
-                    ctx.fillText(`👼 復活次數: ${player.revives}`, hx, hy - 10);
+                    ctx.font = 'bold 18px 微軟正黑體'; ctx.textAlign = 'left';
+                    ctx.fillStyle='rgba(0, 0, 0, 0.8)'; ctx.fillText(`👼 復活次數: ${player.revives}`, hx + 2, hy - 8);
+                    ctx.fillStyle = '#f1c40f'; ctx.fillText(`👼 復活次數: ${player.revives}`, hx, hy - 10);
                 }
 
-                // 畫形狀時關閉陰影
-                ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
-
+                // 血量條繪製
                 ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.strokeRect(hx,hy,hw,hh);
                 const hr=player.hp/player.maxHp; ctx.fillStyle=hr>0.3?'#e74c3c':'#c0392b'; ctx.fillRect(hx+2,hy+2,(hw-4)*hr,hh-4);
                 
-                // 血量數字恢復陰影
-                ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4; ctx.shadowOffsetX = 2; ctx.shadowOffsetY = 2;
-                ctx.fillStyle='#fff'; ctx.font='bold 16px Arial'; ctx.textAlign='center'; ctx.fillText(`${player.hp} / ${player.maxHp}`, hx+hw/2, canvas.height-30);
+                // 血量數字條內置文字
+                ctx.font='bold 16px Arial'; ctx.textAlign='center';
+                ctx.fillStyle='rgba(0, 0, 0, 0.8)'; ctx.fillText(`${player.hp} / ${player.maxHp}`, hx+hw/2 + 1, canvas.height-29);
+                ctx.fillStyle='#fff'; ctx.fillText(`${player.hp} / ${player.maxHp}`, hx+hw/2, canvas.height-30);
 
+                // 哥布林最終傷害倍率 Buff 圖章
                 if (player.damageMultiplier > 1) {
                     const buffX = hx - 45; const buffY = hy + hh / 2;
-                    ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
                     ctx.beginPath(); ctx.arc(buffX, buffY, 18, 0, Math.PI * 2); ctx.fillStyle = '#e74c3c'; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
-                    ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4; ctx.shadowOffsetX = 2; ctx.shadowOffsetY = 2;
-                    ctx.fillStyle = '#fff'; ctx.font = 'bold 16px 微軟正黑體'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('哥', buffX, buffY);
-                    ctx.fillStyle = '#f1c40f'; ctx.font = 'bold 16px Arial'; ctx.textAlign = 'left'; ctx.fillText(`x${player.damageMultiplier}`, buffX + 25, buffY);
+                    
+                    ctx.font = 'bold 16px 微軟正黑體';
+                    ctx.fillStyle='rgba(0, 0, 0, 0.8)'; ctx.fillText('哥', buffX+1, buffY+1);
+                    ctx.fillStyle = '#fff'; ctx.fillText('哥', buffX, buffY);
+                    
+                    ctx.font = 'bold 16px Arial'; ctx.textAlign = 'left';
+                    ctx.fillStyle='rgba(0, 0, 0, 0.8)'; ctx.fillText(`x${player.damageMultiplier}`, buffX + 26, buffY + 1);
+                    ctx.fillStyle = '#f1c40f'; ctx.fillText(`x${player.damageMultiplier}`, buffX + 25, buffY);
                 }
 
+                // 能量大絕招圖示
                 if (skillData[SKILL_TYPES.ULULTIMATE].isLearned) {
-                    ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
                     let globalCdMult = isTariffActive ? 2 : 1;
                     const orbX = canvas.width - 60; const orbY = canvas.height - 110; const orbRadius = 30;
                     let ultBaseCd = player.ultimateUpgraded ? 600 : 1200;
-                    let ultCd = ultBaseCd * globalCdMult; 
+                    let ultCd = ultBaseCd * globalCdMult;
                     let framesSinceFired = frameCount - skillData[SKILL_TYPES.ULULTIMATE].lastFiredFrame;
                     let chargeRatio = Math.min(1, framesSinceFired / ultCd);
-                    
+
                     ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'; ctx.beginPath(); ctx.arc(orbX, orbY, orbRadius, 0, Math.PI * 2); ctx.fill();
-                    ctx.save(); ctx.beginPath(); ctx.arc(orbX, orbY, orbRadius, 0, Math.PI * 2); ctx.clip(); 
+                    ctx.save(); ctx.beginPath(); ctx.arc(orbX, orbY, orbRadius, 0, Math.PI * 2); ctx.clip();
                     let fillHeight = orbRadius * 2 * chargeRatio;
                     ctx.fillStyle = isUltimateReady ? '#f1c40f' : '#e67e22'; ctx.fillRect(orbX - orbRadius, orbY + orbRadius - fillHeight, orbRadius * 2, fillHeight); ctx.restore();
-                    
+
                     ctx.strokeStyle = isUltimateReady ? '#fff' : '#7f8c8d'; ctx.lineWidth = isUltimateReady ? 4 : 2; ctx.beginPath(); ctx.arc(orbX, orbY, orbRadius, 0, Math.PI * 2); ctx.stroke();
-                    
-                    ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4; ctx.shadowOffsetX = 2; ctx.shadowOffsetY = 2;
+
+                    ctx.font = 'bold 16px Arial'; ctx.textAlign = 'center';
                     if (isUltimateReady) {
-                        ctx.shadowBlur = 0; ctx.strokeStyle = '#f1c40f'; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(orbX, orbY, orbRadius, 0, Math.PI * 2); ctx.stroke();
-                        ctx.shadowBlur = 4; ctx.fillStyle = '#fff'; ctx.font = 'bold 16px Arial'; ctx.textAlign = 'center'; ctx.fillText('SPACE', orbX, orbY + 5);
-                    } else { ctx.fillStyle = '#ecf0f1'; ctx.font = '14px Arial'; ctx.textAlign = 'center'; ctx.fillText(`${Math.ceil((ultCd - framesSinceFired)/60)}s`, orbX, orbY + 5); }
+                        ctx.strokeStyle = '#f1c40f'; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(orbX, orbY, orbRadius, 0, Math.PI * 2); ctx.stroke();
+                        ctx.fillStyle='rgba(0, 0, 0, 0.8)'; ctx.fillText('SPACE', orbX+1, orbY + 6);
+                        ctx.fillStyle = '#fff'; ctx.fillText('SPACE', orbX, orbY + 5);
+                    } else { 
+                        let cdText = `${Math.ceil((ultCd - framesSinceFired)/60)}s`;
+                        ctx.fillStyle='rgba(0, 0, 0, 0.8)'; ctx.fillText(cdText, orbX+1, orbY + 6);
+                        ctx.fillStyle = '#ecf0f1'; ctx.fillText(cdText, orbX, orbY + 5); 
+                    }
                 }
                 ctx.restore();
 
+                // 咖啡因狂熱粒子環繞圈 (移除 shadowBlur 迴圈，改用雙層實心粒子)
                 if (player.hasCaffeineFever && player.caffeineStacks > 0) {
-                    ctx.save(); ctx.translate(player.x, player.y); let intensity = player.caffeineStacks / (player.caffeineUpgraded ? 100 : 40); 
+                    ctx.save(); ctx.translate(player.x, player.y); let intensity = player.caffeineStacks / (player.caffeineUpgraded ? 100 : 40);
                     ctx.beginPath(); ctx.arc(0, 0, player.collisionRadius + 15 + (intensity * 40), 0, Math.PI * 2); ctx.fillStyle = `rgba(241, 196, 15, ${0.1 + intensity * 0.25})`; ctx.fill();
-                    let particleCount = Math.floor(5 + intensity * 20); let timeA = frameCount * (0.05 + intensity * 0.08); 
+                    let particleCount = Math.floor(5 + intensity * 20); let timeA = frameCount * (0.05 + intensity * 0.08);
                     for(let i = 0; i < particleCount; i++) {
                         let angle = timeA + (Math.PI * 2 / particleCount) * i; let orbitRadius = player.collisionRadius + 20 + (intensity * 30) + Math.sin(frameCount * 0.15 + i) * 8;
                         let px = Math.cos(angle) * orbitRadius; let py = Math.sin(angle) * orbitRadius;
-                        ctx.beginPath(); ctx.arc(px, py, 4 + intensity * 8, 0, Math.PI * 2); ctx.fillStyle = i % 2 === 0 ? '#f1c40f' : '#e67e22'; ctx.shadowBlur = 15; ctx.shadowColor = '#f39c12'; ctx.fill();
+                        
+                        // 雙圈渲染法：利用外層深色、內層亮色模擬耀眼光子，效能近乎零負擔
+                        ctx.beginPath(); ctx.arc(px, py, 6 + intensity * 4, 0, Math.PI * 2); ctx.fillStyle = '#d35400'; ctx.fill();
+                        ctx.beginPath(); ctx.arc(px, py, 4 + intensity * 4, 0, Math.PI * 2); ctx.fillStyle = i % 2 === 0 ? '#f1c40f' : '#e67e22'; ctx.fill();
                     } ctx.restore();
-                    ctx.fillStyle = '#f1c40f'; ctx.font = 'bold 18px 微軟正黑體'; ctx.textAlign = 'center';
+                    
+                    ctx.fillStyle='rgba(0, 0, 0, 0.8)'; ctx.font = 'bold 18px 微軟正黑體'; ctx.textAlign = 'center';
                     let buffPerStack = player.caffeineUpgraded ? 20 : 8.5;
-                    let bonusText = `+${Math.floor(player.caffeineStacks * buffPerStack)}%`; ctx.fillText(`🔥 ${player.caffeineStacks}層 (${bonusText})`, player.x, player.y - player.collisionRadius - 30);
+                    let bonusText = `+${Math.floor(player.caffeineStacks * buffPerStack)}%`; 
+                    ctx.fillText(`🔥 ${player.caffeineStacks}層 (${bonusText})`, player.x+1, player.y - player.collisionRadius - 29);
+                    ctx.fillStyle = '#f1c40f'; ctx.fillText(`🔥 ${player.caffeineStacks}層 (${bonusText})`, player.x, player.y - player.collisionRadius - 30);
                 }
             } else {
                 ctx.fillStyle = 'rgba(231, 76, 60, 0.85)'; ctx.fillRect(0, canvas.height / 2 - 80, canvas.width, 160);
                 ctx.fillStyle = '#fff'; ctx.font = 'bold 56px 微軟正黑體'; ctx.textAlign = 'left';
                 let offset = (frameCount * 8) % (canvas.width + 1200);
                 ctx.fillText("⚠️ BREAKING NEWS: FAKE NEWS! UI BLOCKED! GREAT WALL! ⚠️", canvas.width - offset, canvas.height / 2);
-                
+
                 if (player.revives > 0 && frameCount % 60 < 30) {
-                    ctx.fillStyle = '#f1c40f'; ctx.font = 'bold 14px 微軟正黑體'; ctx.textAlign = 'center';
-                    ctx.fillText(`👼x${player.revives}`, player.x, player.y - player.collisionRadius - 15);
+                    ctx.fillStyle='rgba(0,0,0,0.8)'; ctx.font = 'bold 14px 微軟正黑體'; ctx.textAlign = 'center';
+                    ctx.fillText(`👼x${player.revives}`, player.x+1, player.y - player.collisionRadius - 14);
+                    ctx.fillStyle = '#f1c40f'; ctx.fillText(`👼x${player.revives}`, player.x, player.y - player.collisionRadius - 15);
                 }
             }
 
@@ -1627,7 +1669,6 @@
 
             ctx.restore();
         }
-
         // ==========================================
         // 1. 初始化 Firebase (請換成你的 Config)
         // ==========================================
